@@ -3,16 +3,19 @@
 <!-- https://freefrontend.com/css-border-animations/ -->
 <!-- https://flexiple.com/javascript/javascript-clock/ -->
 
-<ng-container [ngSwitch]="daylik.state">
+<div
+	class="bg-[#F24236] text-black fill-black flex h-full w-full overflow-auto"
+	[ngSwitch]="daylik.state"
+>
 	<section
-		class="flex items-center justify-center gap-4 h-screen w-screen bg-white p-4"
+		class="flex items-center justify-center gap-4 h-screen w-screen p-4"
 		*ngSwitchCase="'idle'"
 	>
 		<div class="flex flex-col items-center justify-center gap-8">
-			<time class="block text-8xl">{{ daylikTime }}</time>
+			<time class="block text-8xl text-white">{{ daylikTime }}</time>
 			<div class="flex items-center justify-center gap-4">
 				<button
-					class="flex items-center justify-center bg-sky-400 text-white rounded-full p-4"
+					class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
 					type="button"
 					(click)="onDaylikToggleSettings(true)"
 				>
@@ -30,7 +33,7 @@
 					</svg>
 				</button>
 				<button
-					class="flex items-center justify-center bg-sky-400 text-white rounded-full p-4"
+					class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
 					type="button"
 					(click)="onDaylikChangeState()"
 				>
@@ -50,28 +53,30 @@
 			</div>
 		</div>
 	</section>
-	<section
-		class="flex flex-col gap-4 h-screen w-screen bg-white p-4"
-		*ngSwitchDefault
-	>
+	<section class="flex flex-col gap-4 h-screen w-screen p-4" *ngSwitchDefault>
 		<header class="grid grid-cols-3 gap-4">
 			<div
 				class="flex items-center justify-center md:justify-start gap-4 col-span-3 md:col-span-1"
 			>
-				<svg
-					class="bi bi-heart-fill text-rose-400"
-					xmlns="http://www.w3.org/2000/svg"
-					width="32"
-					height="32"
-					fill="currentColor"
-					viewBox="0 0 16 16"
-				>
-					<path
-						fill-rule="evenodd"
-						d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z"
-					/>
-				</svg>
-				<span class="block text-4xl">{{ team.teamName }}</span>
+				<!--				<svg-->
+				<!--					class="bi bi-heart-fill text-rose-400"-->
+				<!--					xmlns="http://www.w3.org/2000/svg"-->
+				<!--					width="32"-->
+				<!--					height="32"-->
+				<!--					fill="currentColor"-->
+				<!--					viewBox="0 0 16 16"-->
+				<!--				>-->
+				<!--					<path-->
+				<!--						fill-rule="evenodd"-->
+				<!--						d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z"-->
+				<!--					/>-->
+				<!--				</svg>-->
+				<img
+					src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/660-christmas-tree.svg/2048px-660-christmas-tree.svg.png"
+					alt=""
+					width="64"
+				/>
+				<span class="block text-4xl text-white">{{ team.teamName }}</span>
 			</div>
 			<div class="flex items-center justify-center col-span-3 md:col-span-1">
 				<div
@@ -79,7 +84,7 @@
 					*ngIf="daylik.state === 'pending'"
 				>
 					<button
-						class="flex items-center justify-center bg-sky-400 text-white rounded-full p-4"
+						class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
 						type="button"
 						(click)="onTeamMemberListShuffle()"
 					>
@@ -101,7 +106,7 @@
 						</svg>
 					</button>
 					<button
-						class="flex items-center justify-center bg-sky-400 text-white rounded-full p-4"
+						class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
 						type="button"
 						(click)="onDaylikChangeState()"
 					>
@@ -124,7 +129,7 @@
 					*ngIf="daylik.state === 'live'"
 				>
 					<button
-						class="flex items-center justify-center bg-sky-400 text-white rounded-full p-4"
+						class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
 						type="button"
 						(click)="setRandom()"
 					>
@@ -149,7 +154,7 @@
 			<div
 				class="flex items-center justify-center md:justify-end col-span-3 md:col-span-1"
 			>
-				<time class="block text-4xl">{{ daylikTime }}</time>
+				<time class="block text-4xl text-white">{{ daylikTime }}</time>
 			</div>
 		</header>
 		<hr />
@@ -161,15 +166,15 @@
 				class="flex items-center justify-center col-span-1 rounded-2xl relative p-4 aspect-square"
 				*ngFor="let teamMember of team.teamMemberList"
 				[ngClass]="{
-					'bg-sky-400': teamMember.state === 'idle' || teamMember.state === 'live',
-					'bg-rose-400': teamMember.state === 'pending',
-					'bg-sky-200': teamMember.state === 'done',
+					'bg-zinc-200': teamMember.state === 'idle' || teamMember.state === 'live',
+					'bg-[url(./assets/ny-background.jpg)] bg-contain text-transparent': teamMember.state === 'pending',
+					'bg-zinc-200/25': teamMember.state === 'done',
 				}"
 				(click)="onTeamMemberChangeState(teamMember)"
 			>
 				<ng-container *ngIf="daylik.state === 'pending'">
 					<button
-						class="absolute right-0 top-0 flex items-center justify-center text-white p-4"
+						class="absolute right-0 top-0 flex items-center justify-center p-4"
 						type="button"
 						(click)="onTeamMemberRemove(teamMember)"
 					>
@@ -188,10 +193,10 @@
 					</button>
 				</ng-container>
 				<ng-container [ngSwitch]="teamMember.state">
-					<span class="text-4xl text-white" *ngSwitchCase="'pending'">
+					<span class="text-4xl" *ngSwitchCase="'pending'">
             {{ teamMember.department }}
           </span>
-					<span class="text-2xl text-white" *ngSwitchDefault>
+					<span class="text-2xl" *ngSwitchDefault>
 						{{ teamMember.name }}
             <ng-container *ngIf="daylikSettingsForm.controls.timer.value === 'yes' || daylikSettingsForm.controls.timer.value === 'in-case-of-hurry' && t2Toggle">
               <svg
@@ -219,15 +224,18 @@
 		</ul>
 	</section>
 	<section
-		class="flex items-center justify-center gap-4 h-screen w-screen bg-white p-4"
+		class="flex items-center justify-center gap-4 h-screen w-screen p-4"
 		*ngSwitchCase="'done'"
 	>
 		<div class="flex flex-col items-center justify-center gap-8">
-			<span class="block text-8xl">Have a good day</span>
+			<span class="block text-8xl text-white">
+				I wish you a happy new year
+			</span>
 			<img
 				class="rounded-2xl"
-				src="assets/kitten-wave-love-you.gif"
+				src="./assets/reindeer-and-santa.gif"
 				alt="Kit"
+				width="400"
 				*ngIf="daylikSettingsForm.controls.fireworks.value"
 			/>
 		</div>
@@ -239,7 +247,7 @@
 		></ng-fireworks>
 	</section>
 	<dialog
-		class="bg-white rounded-2xl"
+		class="bg-zinc-200 rounded-2xl"
 		#daylikSettingsModal
 		(close)="onDaylikToggleSettings(false)"
 	>
@@ -274,7 +282,10 @@
 							max="20"
 							step="1"
 						/>
-						<time *ngIf="daylikSettingsForm.get('timerHurry') as timerHurry">
+						<time
+							class="text-white"
+							*ngIf="daylikSettingsForm.get('timerHurry') as timerHurry"
+						>
 							{{ timerHurry.value }} min.
 						</time>
 					</fieldset>
@@ -291,7 +302,7 @@
 					</fieldset>
 				</div>
 				<button
-					class="flex items-center justify-center bg-sky-400 text-white rounded-2xl p-4"
+					class="flex items-center justify-center bg-zinc-200 rounded-2xl p-4"
 					type="submit"
 				>
 					Save
@@ -299,4 +310,4 @@
 			</form>
 		</div>
 	</dialog>
-</ng-container>
+</div>
