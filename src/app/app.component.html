@@ -15,7 +15,7 @@
 			<time class="block text-8xl text-white">{{ daylikTime }}</time>
 			<div class="flex items-center justify-center gap-4">
 				<button
-					class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
+					class="flex items-center justify-center bg-zinc-100 rounded-full p-4"
 					type="button"
 					(click)="onDaylikToggleSettings(true)"
 				>
@@ -33,7 +33,7 @@
 					</svg>
 				</button>
 				<button
-					class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
+					class="flex items-center justify-center bg-zinc-100 rounded-full p-4"
 					type="button"
 					(click)="onDaylikChangeState()"
 				>
@@ -84,7 +84,7 @@
 					*ngIf="daylik.state === 'pending'"
 				>
 					<button
-						class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
+						class="flex items-center justify-center bg-zinc-100 rounded-full p-4"
 						type="button"
 						(click)="onTeamMemberListShuffle()"
 					>
@@ -106,7 +106,7 @@
 						</svg>
 					</button>
 					<button
-						class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
+						class="flex items-center justify-center bg-zinc-100 rounded-full p-4"
 						type="button"
 						(click)="onDaylikChangeState()"
 					>
@@ -129,7 +129,7 @@
 					*ngIf="daylik.state === 'live'"
 				>
 					<button
-						class="flex items-center justify-center bg-zinc-200 rounded-full p-4"
+						class="flex items-center justify-center bg-zinc-100 rounded-full p-4"
 						type="button"
 						(click)="setRandom()"
 					>
@@ -166,9 +166,9 @@
 				class="flex items-center justify-center col-span-1 rounded-2xl relative p-4 aspect-square"
 				*ngFor="let teamMember of team.teamMemberList"
 				[ngClass]="{
-					'bg-zinc-200': teamMember.state === 'idle' || teamMember.state === 'live',
-					'bg-[url(./assets/ny-background.jpg)] bg-contain text-transparent': teamMember.state === 'pending',
-					'bg-zinc-200/25': teamMember.state === 'done',
+					'bg-zinc-100': teamMember.state === 'idle' || teamMember.state === 'live',
+					'bg-[url(./assets/ny-background.jpg)] bg-contain': teamMember.state === 'pending',
+					'bg-zinc-100/25': teamMember.state === 'done',
 				}"
 				(click)="onTeamMemberChangeState(teamMember)"
 			>
@@ -193,11 +193,11 @@
 					</button>
 				</ng-container>
 				<ng-container [ngSwitch]="teamMember.state">
-					<span class="text-4xl" *ngSwitchCase="'pending'">
+					<span class="text-4xl bg-white p-4 text-center" *ngSwitchCase="'pending'">
             {{ teamMember.department }}
           </span>
 					<span class="text-2xl" *ngSwitchDefault>
-						{{ teamMember.name }}
+						<span class="text-4xl">{{ teamMember.name }}</span>
             <ng-container *ngIf="daylikSettingsForm.controls.timer.value === 'yes' || daylikSettingsForm.controls.timer.value === 'in-case-of-hurry' && t2Toggle">
               <svg
                 class="absolute inset-4"
@@ -212,7 +212,7 @@
                   [attr.cy]="+square / 2"
                   [attr.stroke-linecap]="'round'"
                   [attr.stroke-width]="progressWidth ? progressWidth : 0"
-                  [attr.stroke]="progressColor ? progressColor : '#7dd3fc'"
+                  [attr.stroke]="progressColor ? progressColor : '#fecaca'"
                   [attr.stroke-dasharray]="strokeDasharray"
                   [attr.stroke-dashoffset]="strokeDashoffset"
                 />
@@ -247,7 +247,7 @@
 		></ng-fireworks>
 	</section>
 	<dialog
-		class="bg-zinc-200 rounded-2xl"
+		class="bg-zinc-100 rounded-2xl"
 		#daylikSettingsModal
 		(close)="onDaylikToggleSettings(false)"
 	>
@@ -282,15 +282,14 @@
 							max="20"
 							step="1"
 						/>
-						<time
-							class="text-white"
-							*ngIf="daylikSettingsForm.get('timerHurry') as timerHurry"
-						>
+						<time *ngIf="daylikSettingsForm.get('timerHurry') as timerHurry">
 							{{ timerHurry.value }} min.
 						</time>
 					</fieldset>
 				</div>
-				<div class="flex flex-col gap-4 border p-4 rounded-2xl">
+				<div
+					class="flex flex-col gap-4 border border-[#F24236] p-4 rounded-2xl"
+				>
 					<fieldset class="flex items-center justify-start gap-4">
 						<input
 							id="fireworks"
@@ -302,7 +301,7 @@
 					</fieldset>
 				</div>
 				<button
-					class="flex items-center justify-center bg-zinc-200 rounded-2xl p-4"
+					class="flex items-center justify-center bg-[#F24236] rounded-2xl p-4"
 					type="submit"
 				>
 					Save

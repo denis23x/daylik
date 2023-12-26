@@ -3,3 +3,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face {
+	font-family: "Mountains of Christmas";
+	src:
+		local("Mountains of Christmas"),
+		url("/assets/MountainsofChristmasC-Regular_C.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+* {
+  font-family: 'Mountains of Christmas', serif;
+}
