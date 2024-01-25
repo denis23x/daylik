@@ -37,7 +37,9 @@
         "@typescript-eslint/ban-ts-comment": "off",
         "prettier/prettier": "error"
       },
-      "plugins": ["prettier"]
+      "plugins": [
+        "prettier"
+      ]
     },
     {
       "files": [
@@ -48,5 +50,8 @@
       ],
       "rules": {}
     }
+  ],
+  "extends": [
+    "plugin:storybook/recommended"
   ]
 }

@@ -1,0 +1,1588 @@
+{
+    "pipes": [],
+    "interfaces": [
+        {
+            "name": "Daylik",
+            "id": "interface-Daylik-9d1f55f1d97ad78c09a5e42799cea52ade4c51788d39c93a31e7274ab5e2f7d6c33ccf2b2bc29c96c47ecdda7dbdd73fbeed9a936cde23860d5a9fa6c82723b6",
+            "file": "src/app/app.component.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "interface",
+            "sourceCode": "import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { CommonModule } from '@angular/common';\nimport type { FireworksDirective } from '@fireworks-js/angular';\nimport { NgFireworksModule } from '@fireworks-js/angular';\nimport {\n\tFormBuilder,\n\tFormControl,\n\tFormGroup,\n\tReactiveFormsModule\n} from '@angular/forms';\n\ninterface Daylik {\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n}\n\ninterface DaylikSettingsForm {\n\ttimer: FormControl<string>;\n\ttimerHurry: FormControl<number>;\n\tfireworks: FormControl<boolean>;\n}\n\ninterface Team {\n\tteamName: string;\n\tteamMemberList: TeamMember[];\n}\n\ninterface TeamMember {\n\tid: number;\n\tname: string;\n\timage: string | null;\n\tabsent: boolean;\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n\tdepartment: string;\n}\n\n@Component({\n\tstandalone: true,\n\tselector: 'app-root',\n\ttemplateUrl: './app.component.html',\n\timports: [CommonModule, NgFireworksModule, ReactiveFormsModule]\n})\nexport class AppComponent implements OnInit {\n\t// prettier-ignore\n\t@ViewChild('daylikSettingsModal') daylikSettingsModal: ElementRef<HTMLDialogElement> | undefined;\n\n\t@ViewChild('fireworks') fireworks?: FireworksDirective;\n\n\tdaylik: Daylik = {\n\t\tstate: 'idle'\n\t};\n\tdaylikTime: string | undefined;\n\tdaylikSettingsForm: FormGroup<DaylikSettingsForm>;\n\n\tteam!: Team;\n\n\tt: any;\n\tt2: any;\n\tt2Value: number = 0;\n\tt2Toggle: boolean = false;\n\n\tsquare: number = 180;\n\tviewBox: string = '0 0 180 180';\n\n\tR = 80; // радиус\n\tP = 502.4; // длина окружности\n\tP1 = 5.024; // длина 1% окружности\n\n\tprogress: number = 100; // прогресс в процентах\n\tprogressWidth: number = 4;\n\tprogressColor!: string;\n\n\t// длина прогресса (с корректировкой на половину толщины линии)\n\tprogressLength = +(this.P1 * this.progress - +this.progressWidth / 2).toFixed(\n\t\t3\n\t);\n\n\t// расстояние между отрезками\n\tprogressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\tmapColor!: string;\n\tmapWidth: string | number = 4;\n\n\t// длина + расстояние между отрезками\n\tstrokeDasharray: string = `${this.progressLength} ${this.progressOffset}`;\n\n\t// смещение прогресса (чтоб начинался сверху)\n\tstrokeDashoffset: number = +((this.P / 4) * 3 * -1).toFixed(3);\n\n\tconstructor(\n\t\tprivate httpClient: HttpClient,\n\t\tprivate formBuilder: FormBuilder\n\t) {\n\t\tthis.daylikSettingsForm = this.formBuilder.group<DaylikSettingsForm>({\n\t\t\ttimer: this.formBuilder.nonNullable.control('no', []),\n\t\t\ttimerHurry: this.formBuilder.nonNullable.control(10, []),\n\t\t\tfireworks: this.formBuilder.nonNullable.control(false, [])\n\t\t});\n\t}\n\n\tngOnInit(): void {\n\t\t/** Start time */\n\n\t\tthis.setTime();\n\n\t\t/** Get team */\n\n\t\tthis.setTeam();\n\n\t\t/** Get settings */\n\n\t\t// prettier-ignore\n\t\tconst daylikSettings: string | null =  window.localStorage.getItem('daylikSettings');\n\n\t\tif (daylikSettings) {\n\t\t\tthis.daylikSettingsForm.setValue(JSON.parse(daylikSettings));\n\t\t}\n\t}\n\n\tsetTime(): void {\n\t\tlet date: Date = new Date();\n\t\tlet hh: string | number = date.getHours();\n\t\tlet mm: string | number = date.getMinutes();\n\t\tlet ss: string | number = date.getSeconds();\n\t\tlet session: string = 'AM';\n\n\t\tif (hh === 0) {\n\t\t\thh = 12;\n\t\t}\n\n\t\tif (hh > 12) {\n\t\t\thh = hh - 12;\n\t\t\tsession = 'PM';\n\t\t}\n\n\t\thh = hh < 10 ? '0' + hh : hh;\n\t\tmm = mm < 10 ? '0' + mm : mm;\n\t\tss = ss < 10 ? '0' + ss : ss;\n\n\t\tthis.daylikTime = hh + ':' + mm + ':' + ss + ' ' + session;\n\n\t\tlet t: any = setTimeout(() => this.setTime(), 1000);\n\t}\n\n\tsetTimer(): void {\n\t\tif (this.progress > 0) {\n\t\t\tif (this.progress - 1.6 / 10 > 0) {\n\t\t\t\tthis.progress = this.progress - 1.6 / 10;\n\t\t\t\tthis.onTeamMemberGetTimer();\n\n\t\t\t\tthis.t = setTimeout(() => this.setTimer(), 100);\n\t\t\t} else {\n\t\t\t\tthis.progress = 0;\n\t\t\t\tclearTimeout(this.t);\n\t\t\t}\n\t\t} else {\n\t\t\tthis.progress = 0;\n\t\t\tclearTimeout(this.t);\n\t\t}\n\t}\n\n\tsetTimerDaylik(): void {\n\t\tthis.t2 = setInterval(() => {\n\t\t\tthis.t2Value++;\n\t\t}, 1000);\n\t}\n\n\tsetTeam(): void {\n\t\tthis.httpClient.get<Team>('assets/team.json').subscribe({\n\t\t\tnext: (team: Team) => {\n\t\t\t\t/** Set ids, set default state */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tteam.teamMemberList = team.teamMemberList\n          .filter((teamMember: TeamMember) => !teamMember.absent)\n          .map((teamMember: TeamMember, i: number) => {\n            return {\n              ...teamMember,\n              id: i,\n              state: 'idle'\n            };\n        });\n\n\t\t\t\tthis.team = team;\n\n\t\t\t\t// TODO: Debug\n\t\t\t\t// this.team.teamMemberList = team.teamMemberList.splice(0, 1);\n\t\t\t},\n\t\t\terror: (error: any) => console.log(error)\n\t\t});\n\t}\n\n\tsetRandom(): void {\n\t\t// prettier-ignore\n\t\tconst teamMemberList: TeamMember[] = this.team.teamMemberList.filter((teamMember: TeamMember) => {\n      return teamMember.state === 'pending';\n    });\n\n\t\t// prettier-ignore\n\t\tconst teamMemberRandom: TeamMember = teamMemberList[(teamMemberList.length * Math.random()) | 0];\n\n\t\tif (teamMemberRandom) {\n\t\t\tthis.onTeamMemberChangeState(teamMemberRandom);\n\t\t} else {\n\t\t\t// prettier-ignore\n\t\t\tconst teamMemberLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n        return teamMember.state === 'live';\n      });\n\n\t\t\tif (teamMemberLive) {\n\t\t\t\tthis.onTeamMemberChangeState(teamMemberLive);\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberListShuffle(): void {\n\t\tthis.team.teamMemberList.sort(() => Math.random() - 0.5);\n\t}\n\n\tonTeamMemberRemove(teamMember: TeamMember): void {\n\t\t// prettier-ignore\n\t\tthis.team.teamMemberList = this.team.teamMemberList.filter((teamMemberListItem: TeamMember) => {\n      return teamMemberListItem.id !== teamMember.id;\n    });\n\t}\n\n\tonTeamMemberChangeState(teamMember: TeamMember): void {\n\t\tclearTimeout(this.t);\n\n\t\tswitch (teamMember.state) {\n\t\t\tcase 'pending': {\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst teamMemberIsLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n          return teamMember.state === 'live';\n        })\n\n\t\t\t\t/** Previous live goes to done */\n\n\t\t\t\tif (teamMemberIsLive) {\n\t\t\t\t\tteamMemberIsLive.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tteamMember.state = 'live';\n\n\t\t\t\tif (this.daylikSettingsForm.controls.timer.value === 'yes') {\n\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\tthis.setTimer();\n\t\t\t\t}\n\n\t\t\t\t/** Timer turn on! */\n\n\t\t\t\tif (\n\t\t\t\t\tthis.daylikSettingsForm.controls.timer.value === 'in-case-of-hurry'\n\t\t\t\t) {\n\t\t\t\t\tif (\n\t\t\t\t\t\tthis.t2Value >\n\t\t\t\t\t\tNumber(this.daylikSettingsForm.controls.timerHurry.value) * 60\n\t\t\t\t\t) {\n\t\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\t\tthis.setTimer();\n\n\t\t\t\t\t\tthis.t2Toggle = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'live': {\n\t\t\t\tteamMember.state = 'done';\n\n\t\t\t\t/** Finish Daylik */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst daylikIsDone: boolean = this.team.teamMemberList.every((teamMember: TeamMember) => {\n          return teamMember.state === 'done';\n        });\n\n\t\t\t\tif (daylikIsDone) {\n\t\t\t\t\tthis.daylik.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberGetTimer(): void {\n\t\tconst difference =\n\t\t\t+this.progressWidth > +this.mapWidth\n\t\t\t\t? +this.progressWidth / 2\n\t\t\t\t: +this.mapWidth / 2;\n\n\t\tthis.R = +this.square / 2 - difference;\n\t\tthis.P = 2 * Math.PI * this.R;\n\t\tthis.P1 = this.P / 100;\n\n\t\tthis.progressLength = +(\n\t\t\tthis.P1 * this.progress -\n\t\t\t+this.progressWidth / 2\n\t\t).toFixed(3);\n\t\tthis.progressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\t\tthis.strokeDasharray = `${this.progressLength} ${this.progressOffset}`;\n\t\tthis.strokeDashoffset = +((this.P / 4) * 3 * -1).toFixed(3);\n\t}\n\n\tonDaylikChangeState(): void {\n\t\tswitch (this.daylik.state) {\n\t\t\tcase 'idle': {\n\t\t\t\tthis.daylik.state = 'pending';\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'pending': {\n\t\t\t\tthis.daylik.state = 'live';\n\n\t\t\t\tthis.team.teamMemberList.forEach((teamMember: TeamMember) => {\n\t\t\t\t\tteamMember.state = 'pending';\n\t\t\t\t});\n\n\t\t\t\tthis.setTimerDaylik();\n\t\t\t\tbreak;\n\t\t\t}\n\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonDaylikToggleSettings(toggle: boolean): void {\n\t\tif (toggle) {\n\t\t\tthis.daylikSettingsModal?.nativeElement.showModal();\n\t\t} else {\n\t\t\tthis.daylikSettingsModal?.nativeElement.close();\n\t\t}\n\t}\n\n\tonDaylikSubmitSettings(): void {\n\t\tthis.onDaylikToggleSettings(false);\n\n\t\t// prettier-ignore\n\t\twindow.localStorage.setItem('daylikSettings', JSON.stringify(this.daylikSettingsForm.value));\n\t}\n}\n",
+            "properties": [
+                {
+                    "name": "state",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "\"idle\" | \"pending\" | \"live\" | \"done\"",
+                    "optional": false,
+                    "description": "",
+                    "line": 16
+                }
+            ],
+            "indexSignatures": [],
+            "kind": 171,
+            "methods": [],
+            "extends": []
+        },
+        {
+            "name": "DaylikSettingsForm",
+            "id": "interface-DaylikSettingsForm-9d1f55f1d97ad78c09a5e42799cea52ade4c51788d39c93a31e7274ab5e2f7d6c33ccf2b2bc29c96c47ecdda7dbdd73fbeed9a936cde23860d5a9fa6c82723b6",
+            "file": "src/app/app.component.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "interface",
+            "sourceCode": "import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { CommonModule } from '@angular/common';\nimport type { FireworksDirective } from '@fireworks-js/angular';\nimport { NgFireworksModule } from '@fireworks-js/angular';\nimport {\n\tFormBuilder,\n\tFormControl,\n\tFormGroup,\n\tReactiveFormsModule\n} from '@angular/forms';\n\ninterface Daylik {\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n}\n\ninterface DaylikSettingsForm {\n\ttimer: FormControl<string>;\n\ttimerHurry: FormControl<number>;\n\tfireworks: FormControl<boolean>;\n}\n\ninterface Team {\n\tteamName: string;\n\tteamMemberList: TeamMember[];\n}\n\ninterface TeamMember {\n\tid: number;\n\tname: string;\n\timage: string | null;\n\tabsent: boolean;\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n\tdepartment: string;\n}\n\n@Component({\n\tstandalone: true,\n\tselector: 'app-root',\n\ttemplateUrl: './app.component.html',\n\timports: [CommonModule, NgFireworksModule, ReactiveFormsModule]\n})\nexport class AppComponent implements OnInit {\n\t// prettier-ignore\n\t@ViewChild('daylikSettingsModal') daylikSettingsModal: ElementRef<HTMLDialogElement> | undefined;\n\n\t@ViewChild('fireworks') fireworks?: FireworksDirective;\n\n\tdaylik: Daylik = {\n\t\tstate: 'idle'\n\t};\n\tdaylikTime: string | undefined;\n\tdaylikSettingsForm: FormGroup<DaylikSettingsForm>;\n\n\tteam!: Team;\n\n\tt: any;\n\tt2: any;\n\tt2Value: number = 0;\n\tt2Toggle: boolean = false;\n\n\tsquare: number = 180;\n\tviewBox: string = '0 0 180 180';\n\n\tR = 80; // радиус\n\tP = 502.4; // длина окружности\n\tP1 = 5.024; // длина 1% окружности\n\n\tprogress: number = 100; // прогресс в процентах\n\tprogressWidth: number = 4;\n\tprogressColor!: string;\n\n\t// длина прогресса (с корректировкой на половину толщины линии)\n\tprogressLength = +(this.P1 * this.progress - +this.progressWidth / 2).toFixed(\n\t\t3\n\t);\n\n\t// расстояние между отрезками\n\tprogressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\tmapColor!: string;\n\tmapWidth: string | number = 4;\n\n\t// длина + расстояние между отрезками\n\tstrokeDasharray: string = `${this.progressLength} ${this.progressOffset}`;\n\n\t// смещение прогресса (чтоб начинался сверху)\n\tstrokeDashoffset: number = +((this.P / 4) * 3 * -1).toFixed(3);\n\n\tconstructor(\n\t\tprivate httpClient: HttpClient,\n\t\tprivate formBuilder: FormBuilder\n\t) {\n\t\tthis.daylikSettingsForm = this.formBuilder.group<DaylikSettingsForm>({\n\t\t\ttimer: this.formBuilder.nonNullable.control('no', []),\n\t\t\ttimerHurry: this.formBuilder.nonNullable.control(10, []),\n\t\t\tfireworks: this.formBuilder.nonNullable.control(false, [])\n\t\t});\n\t}\n\n\tngOnInit(): void {\n\t\t/** Start time */\n\n\t\tthis.setTime();\n\n\t\t/** Get team */\n\n\t\tthis.setTeam();\n\n\t\t/** Get settings */\n\n\t\t// prettier-ignore\n\t\tconst daylikSettings: string | null =  window.localStorage.getItem('daylikSettings');\n\n\t\tif (daylikSettings) {\n\t\t\tthis.daylikSettingsForm.setValue(JSON.parse(daylikSettings));\n\t\t}\n\t}\n\n\tsetTime(): void {\n\t\tlet date: Date = new Date();\n\t\tlet hh: string | number = date.getHours();\n\t\tlet mm: string | number = date.getMinutes();\n\t\tlet ss: string | number = date.getSeconds();\n\t\tlet session: string = 'AM';\n\n\t\tif (hh === 0) {\n\t\t\thh = 12;\n\t\t}\n\n\t\tif (hh > 12) {\n\t\t\thh = hh - 12;\n\t\t\tsession = 'PM';\n\t\t}\n\n\t\thh = hh < 10 ? '0' + hh : hh;\n\t\tmm = mm < 10 ? '0' + mm : mm;\n\t\tss = ss < 10 ? '0' + ss : ss;\n\n\t\tthis.daylikTime = hh + ':' + mm + ':' + ss + ' ' + session;\n\n\t\tlet t: any = setTimeout(() => this.setTime(), 1000);\n\t}\n\n\tsetTimer(): void {\n\t\tif (this.progress > 0) {\n\t\t\tif (this.progress - 1.6 / 10 > 0) {\n\t\t\t\tthis.progress = this.progress - 1.6 / 10;\n\t\t\t\tthis.onTeamMemberGetTimer();\n\n\t\t\t\tthis.t = setTimeout(() => this.setTimer(), 100);\n\t\t\t} else {\n\t\t\t\tthis.progress = 0;\n\t\t\t\tclearTimeout(this.t);\n\t\t\t}\n\t\t} else {\n\t\t\tthis.progress = 0;\n\t\t\tclearTimeout(this.t);\n\t\t}\n\t}\n\n\tsetTimerDaylik(): void {\n\t\tthis.t2 = setInterval(() => {\n\t\t\tthis.t2Value++;\n\t\t}, 1000);\n\t}\n\n\tsetTeam(): void {\n\t\tthis.httpClient.get<Team>('assets/team.json').subscribe({\n\t\t\tnext: (team: Team) => {\n\t\t\t\t/** Set ids, set default state */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tteam.teamMemberList = team.teamMemberList\n          .filter((teamMember: TeamMember) => !teamMember.absent)\n          .map((teamMember: TeamMember, i: number) => {\n            return {\n              ...teamMember,\n              id: i,\n              state: 'idle'\n            };\n        });\n\n\t\t\t\tthis.team = team;\n\n\t\t\t\t// TODO: Debug\n\t\t\t\t// this.team.teamMemberList = team.teamMemberList.splice(0, 1);\n\t\t\t},\n\t\t\terror: (error: any) => console.log(error)\n\t\t});\n\t}\n\n\tsetRandom(): void {\n\t\t// prettier-ignore\n\t\tconst teamMemberList: TeamMember[] = this.team.teamMemberList.filter((teamMember: TeamMember) => {\n      return teamMember.state === 'pending';\n    });\n\n\t\t// prettier-ignore\n\t\tconst teamMemberRandom: TeamMember = teamMemberList[(teamMemberList.length * Math.random()) | 0];\n\n\t\tif (teamMemberRandom) {\n\t\t\tthis.onTeamMemberChangeState(teamMemberRandom);\n\t\t} else {\n\t\t\t// prettier-ignore\n\t\t\tconst teamMemberLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n        return teamMember.state === 'live';\n      });\n\n\t\t\tif (teamMemberLive) {\n\t\t\t\tthis.onTeamMemberChangeState(teamMemberLive);\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberListShuffle(): void {\n\t\tthis.team.teamMemberList.sort(() => Math.random() - 0.5);\n\t}\n\n\tonTeamMemberRemove(teamMember: TeamMember): void {\n\t\t// prettier-ignore\n\t\tthis.team.teamMemberList = this.team.teamMemberList.filter((teamMemberListItem: TeamMember) => {\n      return teamMemberListItem.id !== teamMember.id;\n    });\n\t}\n\n\tonTeamMemberChangeState(teamMember: TeamMember): void {\n\t\tclearTimeout(this.t);\n\n\t\tswitch (teamMember.state) {\n\t\t\tcase 'pending': {\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst teamMemberIsLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n          return teamMember.state === 'live';\n        })\n\n\t\t\t\t/** Previous live goes to done */\n\n\t\t\t\tif (teamMemberIsLive) {\n\t\t\t\t\tteamMemberIsLive.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tteamMember.state = 'live';\n\n\t\t\t\tif (this.daylikSettingsForm.controls.timer.value === 'yes') {\n\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\tthis.setTimer();\n\t\t\t\t}\n\n\t\t\t\t/** Timer turn on! */\n\n\t\t\t\tif (\n\t\t\t\t\tthis.daylikSettingsForm.controls.timer.value === 'in-case-of-hurry'\n\t\t\t\t) {\n\t\t\t\t\tif (\n\t\t\t\t\t\tthis.t2Value >\n\t\t\t\t\t\tNumber(this.daylikSettingsForm.controls.timerHurry.value) * 60\n\t\t\t\t\t) {\n\t\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\t\tthis.setTimer();\n\n\t\t\t\t\t\tthis.t2Toggle = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'live': {\n\t\t\t\tteamMember.state = 'done';\n\n\t\t\t\t/** Finish Daylik */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst daylikIsDone: boolean = this.team.teamMemberList.every((teamMember: TeamMember) => {\n          return teamMember.state === 'done';\n        });\n\n\t\t\t\tif (daylikIsDone) {\n\t\t\t\t\tthis.daylik.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberGetTimer(): void {\n\t\tconst difference =\n\t\t\t+this.progressWidth > +this.mapWidth\n\t\t\t\t? +this.progressWidth / 2\n\t\t\t\t: +this.mapWidth / 2;\n\n\t\tthis.R = +this.square / 2 - difference;\n\t\tthis.P = 2 * Math.PI * this.R;\n\t\tthis.P1 = this.P / 100;\n\n\t\tthis.progressLength = +(\n\t\t\tthis.P1 * this.progress -\n\t\t\t+this.progressWidth / 2\n\t\t).toFixed(3);\n\t\tthis.progressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\t\tthis.strokeDasharray = `${this.progressLength} ${this.progressOffset}`;\n\t\tthis.strokeDashoffset = +((this.P / 4) * 3 * -1).toFixed(3);\n\t}\n\n\tonDaylikChangeState(): void {\n\t\tswitch (this.daylik.state) {\n\t\t\tcase 'idle': {\n\t\t\t\tthis.daylik.state = 'pending';\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'pending': {\n\t\t\t\tthis.daylik.state = 'live';\n\n\t\t\t\tthis.team.teamMemberList.forEach((teamMember: TeamMember) => {\n\t\t\t\t\tteamMember.state = 'pending';\n\t\t\t\t});\n\n\t\t\t\tthis.setTimerDaylik();\n\t\t\t\tbreak;\n\t\t\t}\n\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonDaylikToggleSettings(toggle: boolean): void {\n\t\tif (toggle) {\n\t\t\tthis.daylikSettingsModal?.nativeElement.showModal();\n\t\t} else {\n\t\t\tthis.daylikSettingsModal?.nativeElement.close();\n\t\t}\n\t}\n\n\tonDaylikSubmitSettings(): void {\n\t\tthis.onDaylikToggleSettings(false);\n\n\t\t// prettier-ignore\n\t\twindow.localStorage.setItem('daylikSettings', JSON.stringify(this.daylikSettingsForm.value));\n\t}\n}\n",
+            "properties": [
+                {
+                    "name": "fireworks",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "FormControl<boolean>",
+                    "optional": false,
+                    "description": "",
+                    "line": 22
+                },
+                {
+                    "name": "timer",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "FormControl<string>",
+                    "optional": false,
+                    "description": "",
+                    "line": 20
+                },
+                {
+                    "name": "timerHurry",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "FormControl<number>",
+                    "optional": false,
+                    "description": "",
+                    "line": 21
+                }
+            ],
+            "indexSignatures": [],
+            "kind": 171,
+            "methods": [],
+            "extends": []
+        },
+        {
+            "name": "Team",
+            "id": "interface-Team-9d1f55f1d97ad78c09a5e42799cea52ade4c51788d39c93a31e7274ab5e2f7d6c33ccf2b2bc29c96c47ecdda7dbdd73fbeed9a936cde23860d5a9fa6c82723b6",
+            "file": "src/app/app.component.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "interface",
+            "sourceCode": "import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { CommonModule } from '@angular/common';\nimport type { FireworksDirective } from '@fireworks-js/angular';\nimport { NgFireworksModule } from '@fireworks-js/angular';\nimport {\n\tFormBuilder,\n\tFormControl,\n\tFormGroup,\n\tReactiveFormsModule\n} from '@angular/forms';\n\ninterface Daylik {\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n}\n\ninterface DaylikSettingsForm {\n\ttimer: FormControl<string>;\n\ttimerHurry: FormControl<number>;\n\tfireworks: FormControl<boolean>;\n}\n\ninterface Team {\n\tteamName: string;\n\tteamMemberList: TeamMember[];\n}\n\ninterface TeamMember {\n\tid: number;\n\tname: string;\n\timage: string | null;\n\tabsent: boolean;\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n\tdepartment: string;\n}\n\n@Component({\n\tstandalone: true,\n\tselector: 'app-root',\n\ttemplateUrl: './app.component.html',\n\timports: [CommonModule, NgFireworksModule, ReactiveFormsModule]\n})\nexport class AppComponent implements OnInit {\n\t// prettier-ignore\n\t@ViewChild('daylikSettingsModal') daylikSettingsModal: ElementRef<HTMLDialogElement> | undefined;\n\n\t@ViewChild('fireworks') fireworks?: FireworksDirective;\n\n\tdaylik: Daylik = {\n\t\tstate: 'idle'\n\t};\n\tdaylikTime: string | undefined;\n\tdaylikSettingsForm: FormGroup<DaylikSettingsForm>;\n\n\tteam!: Team;\n\n\tt: any;\n\tt2: any;\n\tt2Value: number = 0;\n\tt2Toggle: boolean = false;\n\n\tsquare: number = 180;\n\tviewBox: string = '0 0 180 180';\n\n\tR = 80; // радиус\n\tP = 502.4; // длина окружности\n\tP1 = 5.024; // длина 1% окружности\n\n\tprogress: number = 100; // прогресс в процентах\n\tprogressWidth: number = 4;\n\tprogressColor!: string;\n\n\t// длина прогресса (с корректировкой на половину толщины линии)\n\tprogressLength = +(this.P1 * this.progress - +this.progressWidth / 2).toFixed(\n\t\t3\n\t);\n\n\t// расстояние между отрезками\n\tprogressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\tmapColor!: string;\n\tmapWidth: string | number = 4;\n\n\t// длина + расстояние между отрезками\n\tstrokeDasharray: string = `${this.progressLength} ${this.progressOffset}`;\n\n\t// смещение прогресса (чтоб начинался сверху)\n\tstrokeDashoffset: number = +((this.P / 4) * 3 * -1).toFixed(3);\n\n\tconstructor(\n\t\tprivate httpClient: HttpClient,\n\t\tprivate formBuilder: FormBuilder\n\t) {\n\t\tthis.daylikSettingsForm = this.formBuilder.group<DaylikSettingsForm>({\n\t\t\ttimer: this.formBuilder.nonNullable.control('no', []),\n\t\t\ttimerHurry: this.formBuilder.nonNullable.control(10, []),\n\t\t\tfireworks: this.formBuilder.nonNullable.control(false, [])\n\t\t});\n\t}\n\n\tngOnInit(): void {\n\t\t/** Start time */\n\n\t\tthis.setTime();\n\n\t\t/** Get team */\n\n\t\tthis.setTeam();\n\n\t\t/** Get settings */\n\n\t\t// prettier-ignore\n\t\tconst daylikSettings: string | null =  window.localStorage.getItem('daylikSettings');\n\n\t\tif (daylikSettings) {\n\t\t\tthis.daylikSettingsForm.setValue(JSON.parse(daylikSettings));\n\t\t}\n\t}\n\n\tsetTime(): void {\n\t\tlet date: Date = new Date();\n\t\tlet hh: string | number = date.getHours();\n\t\tlet mm: string | number = date.getMinutes();\n\t\tlet ss: string | number = date.getSeconds();\n\t\tlet session: string = 'AM';\n\n\t\tif (hh === 0) {\n\t\t\thh = 12;\n\t\t}\n\n\t\tif (hh > 12) {\n\t\t\thh = hh - 12;\n\t\t\tsession = 'PM';\n\t\t}\n\n\t\thh = hh < 10 ? '0' + hh : hh;\n\t\tmm = mm < 10 ? '0' + mm : mm;\n\t\tss = ss < 10 ? '0' + ss : ss;\n\n\t\tthis.daylikTime = hh + ':' + mm + ':' + ss + ' ' + session;\n\n\t\tlet t: any = setTimeout(() => this.setTime(), 1000);\n\t}\n\n\tsetTimer(): void {\n\t\tif (this.progress > 0) {\n\t\t\tif (this.progress - 1.6 / 10 > 0) {\n\t\t\t\tthis.progress = this.progress - 1.6 / 10;\n\t\t\t\tthis.onTeamMemberGetTimer();\n\n\t\t\t\tthis.t = setTimeout(() => this.setTimer(), 100);\n\t\t\t} else {\n\t\t\t\tthis.progress = 0;\n\t\t\t\tclearTimeout(this.t);\n\t\t\t}\n\t\t} else {\n\t\t\tthis.progress = 0;\n\t\t\tclearTimeout(this.t);\n\t\t}\n\t}\n\n\tsetTimerDaylik(): void {\n\t\tthis.t2 = setInterval(() => {\n\t\t\tthis.t2Value++;\n\t\t}, 1000);\n\t}\n\n\tsetTeam(): void {\n\t\tthis.httpClient.get<Team>('assets/team.json').subscribe({\n\t\t\tnext: (team: Team) => {\n\t\t\t\t/** Set ids, set default state */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tteam.teamMemberList = team.teamMemberList\n          .filter((teamMember: TeamMember) => !teamMember.absent)\n          .map((teamMember: TeamMember, i: number) => {\n            return {\n              ...teamMember,\n              id: i,\n              state: 'idle'\n            };\n        });\n\n\t\t\t\tthis.team = team;\n\n\t\t\t\t// TODO: Debug\n\t\t\t\t// this.team.teamMemberList = team.teamMemberList.splice(0, 1);\n\t\t\t},\n\t\t\terror: (error: any) => console.log(error)\n\t\t});\n\t}\n\n\tsetRandom(): void {\n\t\t// prettier-ignore\n\t\tconst teamMemberList: TeamMember[] = this.team.teamMemberList.filter((teamMember: TeamMember) => {\n      return teamMember.state === 'pending';\n    });\n\n\t\t// prettier-ignore\n\t\tconst teamMemberRandom: TeamMember = teamMemberList[(teamMemberList.length * Math.random()) | 0];\n\n\t\tif (teamMemberRandom) {\n\t\t\tthis.onTeamMemberChangeState(teamMemberRandom);\n\t\t} else {\n\t\t\t// prettier-ignore\n\t\t\tconst teamMemberLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n        return teamMember.state === 'live';\n      });\n\n\t\t\tif (teamMemberLive) {\n\t\t\t\tthis.onTeamMemberChangeState(teamMemberLive);\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberListShuffle(): void {\n\t\tthis.team.teamMemberList.sort(() => Math.random() - 0.5);\n\t}\n\n\tonTeamMemberRemove(teamMember: TeamMember): void {\n\t\t// prettier-ignore\n\t\tthis.team.teamMemberList = this.team.teamMemberList.filter((teamMemberListItem: TeamMember) => {\n      return teamMemberListItem.id !== teamMember.id;\n    });\n\t}\n\n\tonTeamMemberChangeState(teamMember: TeamMember): void {\n\t\tclearTimeout(this.t);\n\n\t\tswitch (teamMember.state) {\n\t\t\tcase 'pending': {\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst teamMemberIsLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n          return teamMember.state === 'live';\n        })\n\n\t\t\t\t/** Previous live goes to done */\n\n\t\t\t\tif (teamMemberIsLive) {\n\t\t\t\t\tteamMemberIsLive.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tteamMember.state = 'live';\n\n\t\t\t\tif (this.daylikSettingsForm.controls.timer.value === 'yes') {\n\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\tthis.setTimer();\n\t\t\t\t}\n\n\t\t\t\t/** Timer turn on! */\n\n\t\t\t\tif (\n\t\t\t\t\tthis.daylikSettingsForm.controls.timer.value === 'in-case-of-hurry'\n\t\t\t\t) {\n\t\t\t\t\tif (\n\t\t\t\t\t\tthis.t2Value >\n\t\t\t\t\t\tNumber(this.daylikSettingsForm.controls.timerHurry.value) * 60\n\t\t\t\t\t) {\n\t\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\t\tthis.setTimer();\n\n\t\t\t\t\t\tthis.t2Toggle = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'live': {\n\t\t\t\tteamMember.state = 'done';\n\n\t\t\t\t/** Finish Daylik */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst daylikIsDone: boolean = this.team.teamMemberList.every((teamMember: TeamMember) => {\n          return teamMember.state === 'done';\n        });\n\n\t\t\t\tif (daylikIsDone) {\n\t\t\t\t\tthis.daylik.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberGetTimer(): void {\n\t\tconst difference =\n\t\t\t+this.progressWidth > +this.mapWidth\n\t\t\t\t? +this.progressWidth / 2\n\t\t\t\t: +this.mapWidth / 2;\n\n\t\tthis.R = +this.square / 2 - difference;\n\t\tthis.P = 2 * Math.PI * this.R;\n\t\tthis.P1 = this.P / 100;\n\n\t\tthis.progressLength = +(\n\t\t\tthis.P1 * this.progress -\n\t\t\t+this.progressWidth / 2\n\t\t).toFixed(3);\n\t\tthis.progressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\t\tthis.strokeDasharray = `${this.progressLength} ${this.progressOffset}`;\n\t\tthis.strokeDashoffset = +((this.P / 4) * 3 * -1).toFixed(3);\n\t}\n\n\tonDaylikChangeState(): void {\n\t\tswitch (this.daylik.state) {\n\t\t\tcase 'idle': {\n\t\t\t\tthis.daylik.state = 'pending';\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'pending': {\n\t\t\t\tthis.daylik.state = 'live';\n\n\t\t\t\tthis.team.teamMemberList.forEach((teamMember: TeamMember) => {\n\t\t\t\t\tteamMember.state = 'pending';\n\t\t\t\t});\n\n\t\t\t\tthis.setTimerDaylik();\n\t\t\t\tbreak;\n\t\t\t}\n\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonDaylikToggleSettings(toggle: boolean): void {\n\t\tif (toggle) {\n\t\t\tthis.daylikSettingsModal?.nativeElement.showModal();\n\t\t} else {\n\t\t\tthis.daylikSettingsModal?.nativeElement.close();\n\t\t}\n\t}\n\n\tonDaylikSubmitSettings(): void {\n\t\tthis.onDaylikToggleSettings(false);\n\n\t\t// prettier-ignore\n\t\twindow.localStorage.setItem('daylikSettings', JSON.stringify(this.daylikSettingsForm.value));\n\t}\n}\n",
+            "properties": [
+                {
+                    "name": "teamMemberList",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "TeamMember[]",
+                    "optional": false,
+                    "description": "",
+                    "line": 27
+                },
+                {
+                    "name": "teamName",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 26
+                }
+            ],
+            "indexSignatures": [],
+            "kind": 171,
+            "methods": [],
+            "extends": []
+        },
+        {
+            "name": "TeamMember",
+            "id": "interface-TeamMember-9d1f55f1d97ad78c09a5e42799cea52ade4c51788d39c93a31e7274ab5e2f7d6c33ccf2b2bc29c96c47ecdda7dbdd73fbeed9a936cde23860d5a9fa6c82723b6",
+            "file": "src/app/app.component.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "interface",
+            "sourceCode": "import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { CommonModule } from '@angular/common';\nimport type { FireworksDirective } from '@fireworks-js/angular';\nimport { NgFireworksModule } from '@fireworks-js/angular';\nimport {\n\tFormBuilder,\n\tFormControl,\n\tFormGroup,\n\tReactiveFormsModule\n} from '@angular/forms';\n\ninterface Daylik {\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n}\n\ninterface DaylikSettingsForm {\n\ttimer: FormControl<string>;\n\ttimerHurry: FormControl<number>;\n\tfireworks: FormControl<boolean>;\n}\n\ninterface Team {\n\tteamName: string;\n\tteamMemberList: TeamMember[];\n}\n\ninterface TeamMember {\n\tid: number;\n\tname: string;\n\timage: string | null;\n\tabsent: boolean;\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n\tdepartment: string;\n}\n\n@Component({\n\tstandalone: true,\n\tselector: 'app-root',\n\ttemplateUrl: './app.component.html',\n\timports: [CommonModule, NgFireworksModule, ReactiveFormsModule]\n})\nexport class AppComponent implements OnInit {\n\t// prettier-ignore\n\t@ViewChild('daylikSettingsModal') daylikSettingsModal: ElementRef<HTMLDialogElement> | undefined;\n\n\t@ViewChild('fireworks') fireworks?: FireworksDirective;\n\n\tdaylik: Daylik = {\n\t\tstate: 'idle'\n\t};\n\tdaylikTime: string | undefined;\n\tdaylikSettingsForm: FormGroup<DaylikSettingsForm>;\n\n\tteam!: Team;\n\n\tt: any;\n\tt2: any;\n\tt2Value: number = 0;\n\tt2Toggle: boolean = false;\n\n\tsquare: number = 180;\n\tviewBox: string = '0 0 180 180';\n\n\tR = 80; // радиус\n\tP = 502.4; // длина окружности\n\tP1 = 5.024; // длина 1% окружности\n\n\tprogress: number = 100; // прогресс в процентах\n\tprogressWidth: number = 4;\n\tprogressColor!: string;\n\n\t// длина прогресса (с корректировкой на половину толщины линии)\n\tprogressLength = +(this.P1 * this.progress - +this.progressWidth / 2).toFixed(\n\t\t3\n\t);\n\n\t// расстояние между отрезками\n\tprogressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\tmapColor!: string;\n\tmapWidth: string | number = 4;\n\n\t// длина + расстояние между отрезками\n\tstrokeDasharray: string = `${this.progressLength} ${this.progressOffset}`;\n\n\t// смещение прогресса (чтоб начинался сверху)\n\tstrokeDashoffset: number = +((this.P / 4) * 3 * -1).toFixed(3);\n\n\tconstructor(\n\t\tprivate httpClient: HttpClient,\n\t\tprivate formBuilder: FormBuilder\n\t) {\n\t\tthis.daylikSettingsForm = this.formBuilder.group<DaylikSettingsForm>({\n\t\t\ttimer: this.formBuilder.nonNullable.control('no', []),\n\t\t\ttimerHurry: this.formBuilder.nonNullable.control(10, []),\n\t\t\tfireworks: this.formBuilder.nonNullable.control(false, [])\n\t\t});\n\t}\n\n\tngOnInit(): void {\n\t\t/** Start time */\n\n\t\tthis.setTime();\n\n\t\t/** Get team */\n\n\t\tthis.setTeam();\n\n\t\t/** Get settings */\n\n\t\t// prettier-ignore\n\t\tconst daylikSettings: string | null =  window.localStorage.getItem('daylikSettings');\n\n\t\tif (daylikSettings) {\n\t\t\tthis.daylikSettingsForm.setValue(JSON.parse(daylikSettings));\n\t\t}\n\t}\n\n\tsetTime(): void {\n\t\tlet date: Date = new Date();\n\t\tlet hh: string | number = date.getHours();\n\t\tlet mm: string | number = date.getMinutes();\n\t\tlet ss: string | number = date.getSeconds();\n\t\tlet session: string = 'AM';\n\n\t\tif (hh === 0) {\n\t\t\thh = 12;\n\t\t}\n\n\t\tif (hh > 12) {\n\t\t\thh = hh - 12;\n\t\t\tsession = 'PM';\n\t\t}\n\n\t\thh = hh < 10 ? '0' + hh : hh;\n\t\tmm = mm < 10 ? '0' + mm : mm;\n\t\tss = ss < 10 ? '0' + ss : ss;\n\n\t\tthis.daylikTime = hh + ':' + mm + ':' + ss + ' ' + session;\n\n\t\tlet t: any = setTimeout(() => this.setTime(), 1000);\n\t}\n\n\tsetTimer(): void {\n\t\tif (this.progress > 0) {\n\t\t\tif (this.progress - 1.6 / 10 > 0) {\n\t\t\t\tthis.progress = this.progress - 1.6 / 10;\n\t\t\t\tthis.onTeamMemberGetTimer();\n\n\t\t\t\tthis.t = setTimeout(() => this.setTimer(), 100);\n\t\t\t} else {\n\t\t\t\tthis.progress = 0;\n\t\t\t\tclearTimeout(this.t);\n\t\t\t}\n\t\t} else {\n\t\t\tthis.progress = 0;\n\t\t\tclearTimeout(this.t);\n\t\t}\n\t}\n\n\tsetTimerDaylik(): void {\n\t\tthis.t2 = setInterval(() => {\n\t\t\tthis.t2Value++;\n\t\t}, 1000);\n\t}\n\n\tsetTeam(): void {\n\t\tthis.httpClient.get<Team>('assets/team.json').subscribe({\n\t\t\tnext: (team: Team) => {\n\t\t\t\t/** Set ids, set default state */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tteam.teamMemberList = team.teamMemberList\n          .filter((teamMember: TeamMember) => !teamMember.absent)\n          .map((teamMember: TeamMember, i: number) => {\n            return {\n              ...teamMember,\n              id: i,\n              state: 'idle'\n            };\n        });\n\n\t\t\t\tthis.team = team;\n\n\t\t\t\t// TODO: Debug\n\t\t\t\t// this.team.teamMemberList = team.teamMemberList.splice(0, 1);\n\t\t\t},\n\t\t\terror: (error: any) => console.log(error)\n\t\t});\n\t}\n\n\tsetRandom(): void {\n\t\t// prettier-ignore\n\t\tconst teamMemberList: TeamMember[] = this.team.teamMemberList.filter((teamMember: TeamMember) => {\n      return teamMember.state === 'pending';\n    });\n\n\t\t// prettier-ignore\n\t\tconst teamMemberRandom: TeamMember = teamMemberList[(teamMemberList.length * Math.random()) | 0];\n\n\t\tif (teamMemberRandom) {\n\t\t\tthis.onTeamMemberChangeState(teamMemberRandom);\n\t\t} else {\n\t\t\t// prettier-ignore\n\t\t\tconst teamMemberLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n        return teamMember.state === 'live';\n      });\n\n\t\t\tif (teamMemberLive) {\n\t\t\t\tthis.onTeamMemberChangeState(teamMemberLive);\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberListShuffle(): void {\n\t\tthis.team.teamMemberList.sort(() => Math.random() - 0.5);\n\t}\n\n\tonTeamMemberRemove(teamMember: TeamMember): void {\n\t\t// prettier-ignore\n\t\tthis.team.teamMemberList = this.team.teamMemberList.filter((teamMemberListItem: TeamMember) => {\n      return teamMemberListItem.id !== teamMember.id;\n    });\n\t}\n\n\tonTeamMemberChangeState(teamMember: TeamMember): void {\n\t\tclearTimeout(this.t);\n\n\t\tswitch (teamMember.state) {\n\t\t\tcase 'pending': {\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst teamMemberIsLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n          return teamMember.state === 'live';\n        })\n\n\t\t\t\t/** Previous live goes to done */\n\n\t\t\t\tif (teamMemberIsLive) {\n\t\t\t\t\tteamMemberIsLive.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tteamMember.state = 'live';\n\n\t\t\t\tif (this.daylikSettingsForm.controls.timer.value === 'yes') {\n\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\tthis.setTimer();\n\t\t\t\t}\n\n\t\t\t\t/** Timer turn on! */\n\n\t\t\t\tif (\n\t\t\t\t\tthis.daylikSettingsForm.controls.timer.value === 'in-case-of-hurry'\n\t\t\t\t) {\n\t\t\t\t\tif (\n\t\t\t\t\t\tthis.t2Value >\n\t\t\t\t\t\tNumber(this.daylikSettingsForm.controls.timerHurry.value) * 60\n\t\t\t\t\t) {\n\t\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\t\tthis.setTimer();\n\n\t\t\t\t\t\tthis.t2Toggle = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'live': {\n\t\t\t\tteamMember.state = 'done';\n\n\t\t\t\t/** Finish Daylik */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst daylikIsDone: boolean = this.team.teamMemberList.every((teamMember: TeamMember) => {\n          return teamMember.state === 'done';\n        });\n\n\t\t\t\tif (daylikIsDone) {\n\t\t\t\t\tthis.daylik.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberGetTimer(): void {\n\t\tconst difference =\n\t\t\t+this.progressWidth > +this.mapWidth\n\t\t\t\t? +this.progressWidth / 2\n\t\t\t\t: +this.mapWidth / 2;\n\n\t\tthis.R = +this.square / 2 - difference;\n\t\tthis.P = 2 * Math.PI * this.R;\n\t\tthis.P1 = this.P / 100;\n\n\t\tthis.progressLength = +(\n\t\t\tthis.P1 * this.progress -\n\t\t\t+this.progressWidth / 2\n\t\t).toFixed(3);\n\t\tthis.progressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\t\tthis.strokeDasharray = `${this.progressLength} ${this.progressOffset}`;\n\t\tthis.strokeDashoffset = +((this.P / 4) * 3 * -1).toFixed(3);\n\t}\n\n\tonDaylikChangeState(): void {\n\t\tswitch (this.daylik.state) {\n\t\t\tcase 'idle': {\n\t\t\t\tthis.daylik.state = 'pending';\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'pending': {\n\t\t\t\tthis.daylik.state = 'live';\n\n\t\t\t\tthis.team.teamMemberList.forEach((teamMember: TeamMember) => {\n\t\t\t\t\tteamMember.state = 'pending';\n\t\t\t\t});\n\n\t\t\t\tthis.setTimerDaylik();\n\t\t\t\tbreak;\n\t\t\t}\n\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonDaylikToggleSettings(toggle: boolean): void {\n\t\tif (toggle) {\n\t\t\tthis.daylikSettingsModal?.nativeElement.showModal();\n\t\t} else {\n\t\t\tthis.daylikSettingsModal?.nativeElement.close();\n\t\t}\n\t}\n\n\tonDaylikSubmitSettings(): void {\n\t\tthis.onDaylikToggleSettings(false);\n\n\t\t// prettier-ignore\n\t\twindow.localStorage.setItem('daylikSettings', JSON.stringify(this.daylikSettingsForm.value));\n\t}\n}\n",
+            "properties": [
+                {
+                    "name": "absent",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "boolean",
+                    "optional": false,
+                    "description": "",
+                    "line": 34
+                },
+                {
+                    "name": "department",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 36
+                },
+                {
+                    "name": "id",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 31
+                },
+                {
+                    "name": "image",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string | null",
+                    "optional": false,
+                    "description": "",
+                    "line": 33
+                },
+                {
+                    "name": "name",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 32
+                },
+                {
+                    "name": "state",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "\"idle\" | \"pending\" | \"live\" | \"done\"",
+                    "optional": false,
+                    "description": "",
+                    "line": 35
+                }
+            ],
+            "indexSignatures": [],
+            "kind": 171,
+            "methods": [],
+            "extends": []
+        },
+        {
+            "name": "User",
+            "id": "interface-User-d4821beac0e4a852e513391b7470981c4353fdd95a18628bb68136c8695b489ee15b926e2e5031bc26cf30e1508e0a362c3ee13a06734702b4d15af140e485d5",
+            "file": "src/stories/user.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "interface",
+            "sourceCode": "export interface User {\n  name: string;\n}\n",
+            "properties": [
+                {
+                    "name": "name",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 2
+                }
+            ],
+            "indexSignatures": [],
+            "kind": 171,
+            "methods": [],
+            "extends": []
+        }
+    ],
+    "injectables": [],
+    "guards": [],
+    "interceptors": [],
+    "classes": [],
+    "directives": [],
+    "components": [
+        {
+            "name": "AppComponent",
+            "id": "component-AppComponent-9d1f55f1d97ad78c09a5e42799cea52ade4c51788d39c93a31e7274ab5e2f7d6c33ccf2b2bc29c96c47ecdda7dbdd73fbeed9a936cde23860d5a9fa6c82723b6",
+            "file": "src/app/app.component.ts",
+            "encapsulation": [],
+            "entryComponents": [],
+            "inputs": [],
+            "outputs": [],
+            "providers": [],
+            "selector": "app-root",
+            "styleUrls": [],
+            "styles": [],
+            "templateUrl": [
+                "./app.component.html"
+            ],
+            "viewProviders": [],
+            "hostDirectives": [],
+            "inputsClass": [],
+            "outputsClass": [],
+            "propertiesClass": [
+                {
+                    "name": "daylik",
+                    "defaultValue": "{\n\t\tstate: 'idle'\n\t}",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Daylik",
+                    "optional": false,
+                    "description": "",
+                    "line": 51
+                },
+                {
+                    "name": "daylikSettingsForm",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "FormGroup<DaylikSettingsForm>",
+                    "optional": false,
+                    "description": "",
+                    "line": 55
+                },
+                {
+                    "name": "daylikSettingsModal",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "ElementRef<HTMLDialogElement> | undefined",
+                    "optional": false,
+                    "description": "",
+                    "line": 47,
+                    "decorators": [
+                        {
+                            "name": "ViewChild",
+                            "stringifiedArguments": "'daylikSettingsModal'"
+                        }
+                    ],
+                    "modifierKind": [
+                        170
+                    ]
+                },
+                {
+                    "name": "daylikTime",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string | undefined",
+                    "optional": false,
+                    "description": "",
+                    "line": 54
+                },
+                {
+                    "name": "fireworks",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "FireworksDirective",
+                    "optional": true,
+                    "description": "",
+                    "line": 49,
+                    "decorators": [
+                        {
+                            "name": "ViewChild",
+                            "stringifiedArguments": "'fireworks'"
+                        }
+                    ],
+                    "modifierKind": [
+                        170
+                    ]
+                },
+                {
+                    "name": "mapColor",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 83
+                },
+                {
+                    "name": "mapWidth",
+                    "defaultValue": "4",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string | number",
+                    "optional": false,
+                    "description": "",
+                    "line": 84
+                },
+                {
+                    "name": "P",
+                    "defaultValue": "502.4",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 68
+                },
+                {
+                    "name": "P1",
+                    "defaultValue": "5.024",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 69
+                },
+                {
+                    "name": "progress",
+                    "defaultValue": "100",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 71
+                },
+                {
+                    "name": "progressColor",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 73
+                },
+                {
+                    "name": "progressLength",
+                    "defaultValue": "+(this.P1 * this.progress - +this.progressWidth / 2).toFixed(\n\t\t3\n\t)",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 76
+                },
+                {
+                    "name": "progressOffset",
+                    "defaultValue": "+(this.P - this.progressLength).toFixed(3)",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "",
+                    "optional": false,
+                    "description": "",
+                    "line": 81
+                },
+                {
+                    "name": "progressWidth",
+                    "defaultValue": "4",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 72
+                },
+                {
+                    "name": "R",
+                    "defaultValue": "80",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 67
+                },
+                {
+                    "name": "square",
+                    "defaultValue": "180",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 64
+                },
+                {
+                    "name": "strokeDasharray",
+                    "defaultValue": "`${this.progressLength} ${this.progressOffset}`",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 87
+                },
+                {
+                    "name": "strokeDashoffset",
+                    "defaultValue": "+((this.P / 4) * 3 * -1).toFixed(3)",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 90
+                },
+                {
+                    "name": "t",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "any",
+                    "optional": false,
+                    "description": "",
+                    "line": 59
+                },
+                {
+                    "name": "t2",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "any",
+                    "optional": false,
+                    "description": "",
+                    "line": 60
+                },
+                {
+                    "name": "t2Toggle",
+                    "defaultValue": "false",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "boolean",
+                    "optional": false,
+                    "description": "",
+                    "line": 62
+                },
+                {
+                    "name": "t2Value",
+                    "defaultValue": "0",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "number",
+                    "optional": false,
+                    "description": "",
+                    "line": 61
+                },
+                {
+                    "name": "team",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Team",
+                    "optional": false,
+                    "description": "",
+                    "line": 57
+                },
+                {
+                    "name": "viewBox",
+                    "defaultValue": "'0 0 180 180'",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "string",
+                    "optional": false,
+                    "description": "",
+                    "line": 65
+                }
+            ],
+            "methodsClass": [
+                {
+                    "name": "ngOnInit",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 103,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "onDaylikChangeState",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 311,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "onDaylikSubmitSettings",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 343,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "onDaylikToggleSettings",
+                    "args": [
+                        {
+                            "name": "toggle",
+                            "type": "boolean",
+                            "deprecated": false,
+                            "deprecationMessage": ""
+                        }
+                    ],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 335,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "jsdoctags": [
+                        {
+                            "name": "toggle",
+                            "type": "boolean",
+                            "deprecated": false,
+                            "deprecationMessage": "",
+                            "tagName": {
+                                "text": "param"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "onTeamMemberChangeState",
+                    "args": [
+                        {
+                            "name": "teamMember",
+                            "type": "TeamMember",
+                            "deprecated": false,
+                            "deprecationMessage": ""
+                        }
+                    ],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 229,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "jsdoctags": [
+                        {
+                            "name": "teamMember",
+                            "type": "TeamMember",
+                            "deprecated": false,
+                            "deprecationMessage": "",
+                            "tagName": {
+                                "text": "param"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "onTeamMemberGetTimer",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 291,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "onTeamMemberListShuffle",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 218,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "onTeamMemberRemove",
+                    "args": [
+                        {
+                            "name": "teamMember",
+                            "type": "TeamMember",
+                            "deprecated": false,
+                            "deprecationMessage": ""
+                        }
+                    ],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 222,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "jsdoctags": [
+                        {
+                            "name": "teamMember",
+                            "type": "TeamMember",
+                            "deprecated": false,
+                            "deprecationMessage": "",
+                            "tagName": {
+                                "text": "param"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "setRandom",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 195,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "setTeam",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 170,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "setTime",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 122,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "setTimer",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 147,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "setTimerDaylik",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 164,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                }
+            ],
+            "deprecated": false,
+            "deprecationMessage": "",
+            "hostBindings": [],
+            "hostListeners": [],
+            "standalone": true,
+            "imports": [
+                {
+                    "name": "CommonModule",
+                    "type": "module"
+                },
+                {
+                    "name": "NgFireworksModule",
+                    "type": "module"
+                },
+                {
+                    "name": "ReactiveFormsModule",
+                    "type": "module"
+                }
+            ],
+            "description": "",
+            "rawdescription": "\n",
+            "type": "component",
+            "sourceCode": "import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';\nimport { HttpClient } from '@angular/common/http';\nimport { CommonModule } from '@angular/common';\nimport type { FireworksDirective } from '@fireworks-js/angular';\nimport { NgFireworksModule } from '@fireworks-js/angular';\nimport {\n\tFormBuilder,\n\tFormControl,\n\tFormGroup,\n\tReactiveFormsModule\n} from '@angular/forms';\n\ninterface Daylik {\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n}\n\ninterface DaylikSettingsForm {\n\ttimer: FormControl<string>;\n\ttimerHurry: FormControl<number>;\n\tfireworks: FormControl<boolean>;\n}\n\ninterface Team {\n\tteamName: string;\n\tteamMemberList: TeamMember[];\n}\n\ninterface TeamMember {\n\tid: number;\n\tname: string;\n\timage: string | null;\n\tabsent: boolean;\n\tstate: 'idle' | 'pending' | 'live' | 'done';\n\tdepartment: string;\n}\n\n@Component({\n\tstandalone: true,\n\tselector: 'app-root',\n\ttemplateUrl: './app.component.html',\n\timports: [CommonModule, NgFireworksModule, ReactiveFormsModule]\n})\nexport class AppComponent implements OnInit {\n\t// prettier-ignore\n\t@ViewChild('daylikSettingsModal') daylikSettingsModal: ElementRef<HTMLDialogElement> | undefined;\n\n\t@ViewChild('fireworks') fireworks?: FireworksDirective;\n\n\tdaylik: Daylik = {\n\t\tstate: 'idle'\n\t};\n\tdaylikTime: string | undefined;\n\tdaylikSettingsForm: FormGroup<DaylikSettingsForm>;\n\n\tteam!: Team;\n\n\tt: any;\n\tt2: any;\n\tt2Value: number = 0;\n\tt2Toggle: boolean = false;\n\n\tsquare: number = 180;\n\tviewBox: string = '0 0 180 180';\n\n\tR = 80; // радиус\n\tP = 502.4; // длина окружности\n\tP1 = 5.024; // длина 1% окружности\n\n\tprogress: number = 100; // прогресс в процентах\n\tprogressWidth: number = 4;\n\tprogressColor!: string;\n\n\t// длина прогресса (с корректировкой на половину толщины линии)\n\tprogressLength = +(this.P1 * this.progress - +this.progressWidth / 2).toFixed(\n\t\t3\n\t);\n\n\t// расстояние между отрезками\n\tprogressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\tmapColor!: string;\n\tmapWidth: string | number = 4;\n\n\t// длина + расстояние между отрезками\n\tstrokeDasharray: string = `${this.progressLength} ${this.progressOffset}`;\n\n\t// смещение прогресса (чтоб начинался сверху)\n\tstrokeDashoffset: number = +((this.P / 4) * 3 * -1).toFixed(3);\n\n\tconstructor(\n\t\tprivate httpClient: HttpClient,\n\t\tprivate formBuilder: FormBuilder\n\t) {\n\t\tthis.daylikSettingsForm = this.formBuilder.group<DaylikSettingsForm>({\n\t\t\ttimer: this.formBuilder.nonNullable.control('no', []),\n\t\t\ttimerHurry: this.formBuilder.nonNullable.control(10, []),\n\t\t\tfireworks: this.formBuilder.nonNullable.control(false, [])\n\t\t});\n\t}\n\n\tngOnInit(): void {\n\t\t/** Start time */\n\n\t\tthis.setTime();\n\n\t\t/** Get team */\n\n\t\tthis.setTeam();\n\n\t\t/** Get settings */\n\n\t\t// prettier-ignore\n\t\tconst daylikSettings: string | null =  window.localStorage.getItem('daylikSettings');\n\n\t\tif (daylikSettings) {\n\t\t\tthis.daylikSettingsForm.setValue(JSON.parse(daylikSettings));\n\t\t}\n\t}\n\n\tsetTime(): void {\n\t\tlet date: Date = new Date();\n\t\tlet hh: string | number = date.getHours();\n\t\tlet mm: string | number = date.getMinutes();\n\t\tlet ss: string | number = date.getSeconds();\n\t\tlet session: string = 'AM';\n\n\t\tif (hh === 0) {\n\t\t\thh = 12;\n\t\t}\n\n\t\tif (hh > 12) {\n\t\t\thh = hh - 12;\n\t\t\tsession = 'PM';\n\t\t}\n\n\t\thh = hh < 10 ? '0' + hh : hh;\n\t\tmm = mm < 10 ? '0' + mm : mm;\n\t\tss = ss < 10 ? '0' + ss : ss;\n\n\t\tthis.daylikTime = hh + ':' + mm + ':' + ss + ' ' + session;\n\n\t\tlet t: any = setTimeout(() => this.setTime(), 1000);\n\t}\n\n\tsetTimer(): void {\n\t\tif (this.progress > 0) {\n\t\t\tif (this.progress - 1.6 / 10 > 0) {\n\t\t\t\tthis.progress = this.progress - 1.6 / 10;\n\t\t\t\tthis.onTeamMemberGetTimer();\n\n\t\t\t\tthis.t = setTimeout(() => this.setTimer(), 100);\n\t\t\t} else {\n\t\t\t\tthis.progress = 0;\n\t\t\t\tclearTimeout(this.t);\n\t\t\t}\n\t\t} else {\n\t\t\tthis.progress = 0;\n\t\t\tclearTimeout(this.t);\n\t\t}\n\t}\n\n\tsetTimerDaylik(): void {\n\t\tthis.t2 = setInterval(() => {\n\t\t\tthis.t2Value++;\n\t\t}, 1000);\n\t}\n\n\tsetTeam(): void {\n\t\tthis.httpClient.get<Team>('assets/team.json').subscribe({\n\t\t\tnext: (team: Team) => {\n\t\t\t\t/** Set ids, set default state */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tteam.teamMemberList = team.teamMemberList\n          .filter((teamMember: TeamMember) => !teamMember.absent)\n          .map((teamMember: TeamMember, i: number) => {\n            return {\n              ...teamMember,\n              id: i,\n              state: 'idle'\n            };\n        });\n\n\t\t\t\tthis.team = team;\n\n\t\t\t\t// TODO: Debug\n\t\t\t\t// this.team.teamMemberList = team.teamMemberList.splice(0, 1);\n\t\t\t},\n\t\t\terror: (error: any) => console.log(error)\n\t\t});\n\t}\n\n\tsetRandom(): void {\n\t\t// prettier-ignore\n\t\tconst teamMemberList: TeamMember[] = this.team.teamMemberList.filter((teamMember: TeamMember) => {\n      return teamMember.state === 'pending';\n    });\n\n\t\t// prettier-ignore\n\t\tconst teamMemberRandom: TeamMember = teamMemberList[(teamMemberList.length * Math.random()) | 0];\n\n\t\tif (teamMemberRandom) {\n\t\t\tthis.onTeamMemberChangeState(teamMemberRandom);\n\t\t} else {\n\t\t\t// prettier-ignore\n\t\t\tconst teamMemberLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n        return teamMember.state === 'live';\n      });\n\n\t\t\tif (teamMemberLive) {\n\t\t\t\tthis.onTeamMemberChangeState(teamMemberLive);\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberListShuffle(): void {\n\t\tthis.team.teamMemberList.sort(() => Math.random() - 0.5);\n\t}\n\n\tonTeamMemberRemove(teamMember: TeamMember): void {\n\t\t// prettier-ignore\n\t\tthis.team.teamMemberList = this.team.teamMemberList.filter((teamMemberListItem: TeamMember) => {\n      return teamMemberListItem.id !== teamMember.id;\n    });\n\t}\n\n\tonTeamMemberChangeState(teamMember: TeamMember): void {\n\t\tclearTimeout(this.t);\n\n\t\tswitch (teamMember.state) {\n\t\t\tcase 'pending': {\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst teamMemberIsLive: TeamMember | undefined = this.team.teamMemberList.find((teamMember: TeamMember) => {\n          return teamMember.state === 'live';\n        })\n\n\t\t\t\t/** Previous live goes to done */\n\n\t\t\t\tif (teamMemberIsLive) {\n\t\t\t\t\tteamMemberIsLive.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tteamMember.state = 'live';\n\n\t\t\t\tif (this.daylikSettingsForm.controls.timer.value === 'yes') {\n\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\tthis.setTimer();\n\t\t\t\t}\n\n\t\t\t\t/** Timer turn on! */\n\n\t\t\t\tif (\n\t\t\t\t\tthis.daylikSettingsForm.controls.timer.value === 'in-case-of-hurry'\n\t\t\t\t) {\n\t\t\t\t\tif (\n\t\t\t\t\t\tthis.t2Value >\n\t\t\t\t\t\tNumber(this.daylikSettingsForm.controls.timerHurry.value) * 60\n\t\t\t\t\t) {\n\t\t\t\t\t\tthis.progress = 100;\n\t\t\t\t\t\tthis.setTimer();\n\n\t\t\t\t\t\tthis.t2Toggle = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'live': {\n\t\t\t\tteamMember.state = 'done';\n\n\t\t\t\t/** Finish Daylik */\n\n\t\t\t\t// prettier-ignore\n\t\t\t\tconst daylikIsDone: boolean = this.team.teamMemberList.every((teamMember: TeamMember) => {\n          return teamMember.state === 'done';\n        });\n\n\t\t\t\tif (daylikIsDone) {\n\t\t\t\t\tthis.daylik.state = 'done';\n\t\t\t\t}\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonTeamMemberGetTimer(): void {\n\t\tconst difference =\n\t\t\t+this.progressWidth > +this.mapWidth\n\t\t\t\t? +this.progressWidth / 2\n\t\t\t\t: +this.mapWidth / 2;\n\n\t\tthis.R = +this.square / 2 - difference;\n\t\tthis.P = 2 * Math.PI * this.R;\n\t\tthis.P1 = this.P / 100;\n\n\t\tthis.progressLength = +(\n\t\t\tthis.P1 * this.progress -\n\t\t\t+this.progressWidth / 2\n\t\t).toFixed(3);\n\t\tthis.progressOffset = +(this.P - this.progressLength).toFixed(3);\n\n\t\tthis.strokeDasharray = `${this.progressLength} ${this.progressOffset}`;\n\t\tthis.strokeDashoffset = +((this.P / 4) * 3 * -1).toFixed(3);\n\t}\n\n\tonDaylikChangeState(): void {\n\t\tswitch (this.daylik.state) {\n\t\t\tcase 'idle': {\n\t\t\t\tthis.daylik.state = 'pending';\n\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'pending': {\n\t\t\t\tthis.daylik.state = 'live';\n\n\t\t\t\tthis.team.teamMemberList.forEach((teamMember: TeamMember) => {\n\t\t\t\t\tteamMember.state = 'pending';\n\t\t\t\t});\n\n\t\t\t\tthis.setTimerDaylik();\n\t\t\t\tbreak;\n\t\t\t}\n\n\t\t\tdefault: {\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tonDaylikToggleSettings(toggle: boolean): void {\n\t\tif (toggle) {\n\t\t\tthis.daylikSettingsModal?.nativeElement.showModal();\n\t\t} else {\n\t\t\tthis.daylikSettingsModal?.nativeElement.close();\n\t\t}\n\t}\n\n\tonDaylikSubmitSettings(): void {\n\t\tthis.onDaylikToggleSettings(false);\n\n\t\t// prettier-ignore\n\t\twindow.localStorage.setItem('daylikSettings', JSON.stringify(this.daylikSettingsForm.value));\n\t}\n}\n",
+            "assetsDirs": [],
+            "styleUrlsData": "",
+            "stylesData": "",
+            "constructorObj": {
+                "name": "constructor",
+                "description": "",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "args": [
+                    {
+                        "name": "httpClient",
+                        "type": "HttpClient",
+                        "deprecated": false,
+                        "deprecationMessage": ""
+                    },
+                    {
+                        "name": "formBuilder",
+                        "type": "FormBuilder",
+                        "deprecated": false,
+                        "deprecationMessage": ""
+                    }
+                ],
+                "line": 90,
+                "jsdoctags": [
+                    {
+                        "name": "httpClient",
+                        "type": "HttpClient",
+                        "deprecated": false,
+                        "deprecationMessage": "",
+                        "tagName": {
+                            "text": "param"
+                        }
+                    },
+                    {
+                        "name": "formBuilder",
+                        "type": "FormBuilder",
+                        "deprecated": false,
+                        "deprecationMessage": "",
+                        "tagName": {
+                            "text": "param"
+                        }
+                    }
+                ]
+            },
+            "extends": [],
+            "implements": [
+                "OnInit"
+            ],
+            "templateData": "<!-- @format -->\n\n<!-- https://freefrontend.com/css-border-animations/ -->\n<!-- https://flexiple.com/javascript/javascript-clock/ -->\n\n<ng-container [ngSwitch]=\"daylik.state\">\n\t<section\n\t\tclass=\"flex items-center justify-center gap-4 h-screen w-screen bg-white p-4\"\n\t\t*ngSwitchCase=\"'idle'\"\n\t>\n\t\t<div class=\"flex flex-col items-center justify-center gap-8\">\n\t\t\t<time class=\"block text-8xl\">{{ daylikTime }}</time>\n\t\t\t<div class=\"flex items-center justify-center gap-4\">\n\t\t\t\t<button\n\t\t\t\t\tclass=\"flex items-center justify-center bg-sky-400 text-white rounded-full p-4\"\n\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t(click)=\"onDaylikToggleSettings(true)\"\n\t\t\t\t>\n\t\t\t\t\t<svg\n\t\t\t\t\t\tclass=\"bi bi-gear-fill\"\n\t\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\t\twidth=\"16\"\n\t\t\t\t\t\theight=\"16\"\n\t\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<path\n\t\t\t\t\t\t\td=\"M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z\"\n\t\t\t\t\t\t/>\n\t\t\t\t\t</svg>\n\t\t\t\t</button>\n\t\t\t\t<button\n\t\t\t\t\tclass=\"flex items-center justify-center bg-sky-400 text-white rounded-full p-4\"\n\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t(click)=\"onDaylikChangeState()\"\n\t\t\t\t>\n\t\t\t\t\t<svg\n\t\t\t\t\t\tclass=\"bi bi-play-fill\"\n\t\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\t\twidth=\"16\"\n\t\t\t\t\t\theight=\"16\"\n\t\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<path\n\t\t\t\t\t\t\td=\"m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z\"\n\t\t\t\t\t\t/>\n\t\t\t\t\t</svg>\n\t\t\t\t</button>\n\t\t\t</div>\n\t\t</div>\n\t</section>\n\t<section\n\t\tclass=\"flex flex-col gap-4 h-screen w-screen bg-white p-4\"\n\t\t*ngSwitchDefault\n\t>\n\t\t<header class=\"grid grid-cols-3 gap-4\">\n\t\t\t<div\n\t\t\t\tclass=\"flex items-center justify-center md:justify-start gap-4 col-span-3 md:col-span-1\"\n\t\t\t>\n\t\t\t\t<svg\n\t\t\t\t\tclass=\"bi bi-heart-fill text-rose-400\"\n\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\twidth=\"32\"\n\t\t\t\t\theight=\"32\"\n\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t>\n\t\t\t\t\t<path\n\t\t\t\t\t\tfill-rule=\"evenodd\"\n\t\t\t\t\t\td=\"M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z\"\n\t\t\t\t\t/>\n\t\t\t\t</svg>\n\t\t\t\t<span class=\"block text-4xl\">{{ team.teamName }}</span>\n\t\t\t</div>\n\t\t\t<div class=\"flex items-center justify-center col-span-3 md:col-span-1\">\n\t\t\t\t<div\n\t\t\t\t\tclass=\"flex items-center justify-center gap-4\"\n\t\t\t\t\t*ngIf=\"daylik.state === 'pending'\"\n\t\t\t\t>\n\t\t\t\t\t<button\n\t\t\t\t\t\tclass=\"flex items-center justify-center bg-sky-400 text-white rounded-full p-4\"\n\t\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t\t(click)=\"onTeamMemberListShuffle()\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<svg\n\t\t\t\t\t\t\tclass=\"bi bi-shuffle\"\n\t\t\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\t\t\twidth=\"16\"\n\t\t\t\t\t\t\theight=\"16\"\n\t\t\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\t<path\n\t\t\t\t\t\t\t\tfill-rule=\"evenodd\"\n\t\t\t\t\t\t\t\td=\"M0 3.5A.5.5 0 0 1 .5 3H1c2.202 0 3.827 1.24 4.874 2.418.49.552.865 1.102 1.126 1.532.26-.43.636-.98 1.126-1.532C9.173 4.24 10.798 3 13 3v1c-1.798 0-3.173 1.01-4.126 2.082A9.624 9.624 0 0 0 7.556 8a9.624 9.624 0 0 0 1.317 1.918C9.828 10.99 11.204 12 13 12v1c-2.202 0-3.827-1.24-4.874-2.418A10.595 10.595 0 0 1 7 9.05c-.26.43-.636.98-1.126 1.532C4.827 11.76 3.202 13 1 13H.5a.5.5 0 0 1 0-1H1c1.798 0 3.173-1.01 4.126-2.082A9.624 9.624 0 0 0 6.444 8a9.624 9.624 0 0 0-1.317-1.918C4.172 5.01 2.796 4 1 4H.5a.5.5 0 0 1-.5-.5z\"\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t<path\n\t\t\t\t\t\t\t\td=\"M13 5.466V1.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192zm0 9v-3.932a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192z\"\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t</svg>\n\t\t\t\t\t</button>\n\t\t\t\t\t<button\n\t\t\t\t\t\tclass=\"flex items-center justify-center bg-sky-400 text-white rounded-full p-4\"\n\t\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t\t(click)=\"onDaylikChangeState()\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<svg\n\t\t\t\t\t\t\tclass=\"bi bi-play-fill\"\n\t\t\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\t\t\twidth=\"16\"\n\t\t\t\t\t\t\theight=\"16\"\n\t\t\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\t<path\n\t\t\t\t\t\t\t\td=\"m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z\"\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t</svg>\n\t\t\t\t\t</button>\n\t\t\t\t</div>\n\t\t\t\t<div\n\t\t\t\t\tclass=\"flex items-center justify-center gap-4\"\n\t\t\t\t\t*ngIf=\"daylik.state === 'live'\"\n\t\t\t\t>\n\t\t\t\t\t<button\n\t\t\t\t\t\tclass=\"flex items-center justify-center bg-sky-400 text-white rounded-full p-4\"\n\t\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t\t(click)=\"setRandom()\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<svg\n\t\t\t\t\t\t\tclass=\"bi bi-dice-5\"\n\t\t\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\t\t\twidth=\"16\"\n\t\t\t\t\t\t\theight=\"16\"\n\t\t\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\t<path\n\t\t\t\t\t\t\t\td=\"M13 1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h10zM3 0a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3H3z\"\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t<path\n\t\t\t\t\t\t\t\td=\"M5.5 4a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm8 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-8 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm4-4a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z\"\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t</svg>\n\t\t\t\t\t</button>\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t\t<div\n\t\t\t\tclass=\"flex items-center justify-center md:justify-end col-span-3 md:col-span-1\"\n\t\t\t>\n\t\t\t\t<time class=\"block text-4xl\">{{ daylikTime }}</time>\n\t\t\t</div>\n\t\t</header>\n\t\t<hr />\n\t\t<ul\n\t\t\tclass=\"grid gap-4 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] grid-flow-row auto-rows-max grid-rows-none h-full w-full\"\n\t\t>\n\t\t\t<!-- prettier-ignore -->\n\t\t\t<li\n\t\t\t\tclass=\"flex items-center justify-center col-span-1 rounded-2xl relative p-4 aspect-square\"\n\t\t\t\t*ngFor=\"let teamMember of team.teamMemberList\"\n\t\t\t\t[ngClass]=\"{\n\t\t\t\t\t'bg-sky-400': teamMember.state === 'idle' || teamMember.state === 'live',\n\t\t\t\t\t'bg-rose-400': teamMember.state === 'pending',\n\t\t\t\t\t'bg-sky-200': teamMember.state === 'done',\n\t\t\t\t}\"\n\t\t\t\t(click)=\"onTeamMemberChangeState(teamMember)\"\n\t\t\t>\n\t\t\t\t<ng-container *ngIf=\"daylik.state === 'pending'\">\n\t\t\t\t\t<button\n\t\t\t\t\t\tclass=\"absolute right-0 top-0 flex items-center justify-center text-white p-4\"\n\t\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t\t(click)=\"onTeamMemberRemove(teamMember)\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<svg\n\t\t\t\t\t\t\tclass=\"bi bi-x-lg\"\n\t\t\t\t\t\t\txmlns=\"http://www.w3.org/2000/svg\"\n\t\t\t\t\t\t\twidth=\"16\"\n\t\t\t\t\t\t\theight=\"16\"\n\t\t\t\t\t\t\tfill=\"currentColor\"\n\t\t\t\t\t\t\tviewBox=\"0 0 16 16\"\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\t<path\n\t\t\t\t\t\t\t\td=\"M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z\"\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t</svg>\n\t\t\t\t\t</button>\n\t\t\t\t</ng-container>\n\t\t\t\t<ng-container [ngSwitch]=\"teamMember.state\">\n\t\t\t\t\t<span class=\"text-4xl text-white\" *ngSwitchCase=\"'pending'\">\n            {{ teamMember.department }}\n          </span>\n\t\t\t\t\t<span class=\"text-2xl text-white\" *ngSwitchDefault>\n\t\t\t\t\t\t{{ teamMember.name }}\n            <ng-container *ngIf=\"daylikSettingsForm.controls.timer.value === 'yes' || daylikSettingsForm.controls.timer.value === 'in-case-of-hurry' && t2Toggle\">\n              <svg\n                class=\"absolute inset-4\"\n                [attr.viewBox]=\"viewBox\"\n                *ngIf=\"teamMember.state === 'live' && !!progress\"\n              >\n                <circle\n                  class=\"duration-200\"\n                  fill=\"none\"\n                  [attr.r]=\"R\"\n                  [attr.cx]=\"+square / 2\"\n                  [attr.cy]=\"+square / 2\"\n                  [attr.stroke-linecap]=\"'round'\"\n                  [attr.stroke-width]=\"progressWidth ? progressWidth : 0\"\n                  [attr.stroke]=\"progressColor ? progressColor : '#7dd3fc'\"\n                  [attr.stroke-dasharray]=\"strokeDasharray\"\n                  [attr.stroke-dashoffset]=\"strokeDashoffset\"\n                />\n              </svg>\n            </ng-container>\n\t\t\t\t\t</span>\n\t\t\t\t</ng-container>\n\t\t\t</li>\n\t\t</ul>\n\t</section>\n\t<section\n\t\tclass=\"flex items-center justify-center gap-4 h-screen w-screen bg-white p-4\"\n\t\t*ngSwitchCase=\"'done'\"\n\t>\n\t\t<div class=\"flex flex-col items-center justify-center gap-8\">\n\t\t\t<span class=\"block text-8xl\">Have a good day</span>\n\t\t\t<img\n\t\t\t\tclass=\"rounded-2xl\"\n\t\t\t\tsrc=\"assets/kitten-wave-love-you.gif\"\n\t\t\t\talt=\"Kit\"\n\t\t\t\t*ngIf=\"daylikSettingsForm.controls.fireworks.value\"\n\t\t\t/>\n\t\t</div>\n\t\t<ng-fireworks\n\t\t\tclass=\"fixed inset-0\"\n\t\t\t#fireworks=\"ngFireworks\"\n\t\t\t*ngIf=\"daylikSettingsForm.controls.fireworks.value\"\n\t\t\t[options]=\"{ opacity: 1 }\"\n\t\t></ng-fireworks>\n\t</section>\n\t<dialog\n\t\tclass=\"bg-white rounded-2xl\"\n\t\t#daylikSettingsModal\n\t\t(close)=\"onDaylikToggleSettings(false)\"\n\t>\n\t\t<div class=\"flex flex-col gap-4 p-4\">\n\t\t\t<div class=\"block text-6xl\">Settings</div>\n\t\t\t<form\n\t\t\t\tclass=\"flex flex-col gap-4\"\n\t\t\t\t[formGroup]=\"daylikSettingsForm\"\n\t\t\t\t(ngSubmit)=\"onDaylikSubmitSettings()\"\n\t\t\t>\n\t\t\t\t<div class=\"flex flex-col gap-4 border p-4 rounded-2xl\">\n\t\t\t\t\t<fieldset class=\"flex items-center justify-start gap-4\">\n\t\t\t\t\t\t<label for=\"timer\">Timer:</label>\n\t\t\t\t\t\t<select id=\"timer\" name=\"timer\" formControlName=\"timer\">\n\t\t\t\t\t\t\t<option value=\"no\">No</option>\n\t\t\t\t\t\t\t<option value=\"yes\">Yes</option>\n\t\t\t\t\t\t\t<option value=\"in-case-of-hurry\">In case of hurry</option>\n\t\t\t\t\t\t</select>\n\t\t\t\t\t</fieldset>\n\t\t\t\t\t<fieldset\n\t\t\t\t\t\tclass=\"flex items-center justify-start gap-4\"\n\t\t\t\t\t\t*ngIf=\"daylikSettingsForm.get('timer') as timer\"\n\t\t\t\t\t\t[class.hidden]=\"timer.value !== 'in-case-of-hurry'\"\n\t\t\t\t\t>\n\t\t\t\t\t\t<label for=\"case-of-hurry\">Hurry up after</label>\n\t\t\t\t\t\t<input\n\t\t\t\t\t\t\tid=\"case-of-hurry\"\n\t\t\t\t\t\t\tname=\"case-of-hurry\"\n\t\t\t\t\t\t\ttype=\"range\"\n\t\t\t\t\t\t\tformControlName=\"timerHurry\"\n\t\t\t\t\t\t\tmin=\"1\"\n\t\t\t\t\t\t\tmax=\"20\"\n\t\t\t\t\t\t\tstep=\"1\"\n\t\t\t\t\t\t/>\n\t\t\t\t\t\t<time *ngIf=\"daylikSettingsForm.get('timerHurry') as timerHurry\">\n\t\t\t\t\t\t\t{{ timerHurry.value }} min.\n\t\t\t\t\t\t</time>\n\t\t\t\t\t</fieldset>\n\t\t\t\t</div>\n\t\t\t\t<div class=\"flex flex-col gap-4 border p-4 rounded-2xl\">\n\t\t\t\t\t<fieldset class=\"flex items-center justify-start gap-4\">\n\t\t\t\t\t\t<input\n\t\t\t\t\t\t\tid=\"fireworks\"\n\t\t\t\t\t\t\tname=\"fireworks\"\n\t\t\t\t\t\t\ttype=\"checkbox\"\n\t\t\t\t\t\t\tformControlName=\"fireworks\"\n\t\t\t\t\t\t/>\n\t\t\t\t\t\t<label for=\"fireworks\">Wanna fireworks?</label>\n\t\t\t\t\t</fieldset>\n\t\t\t\t</div>\n\t\t\t\t<button\n\t\t\t\t\tclass=\"flex items-center justify-center bg-sky-400 text-white rounded-2xl p-4\"\n\t\t\t\t\ttype=\"submit\"\n\t\t\t\t>\n\t\t\t\t\tSave\n\t\t\t\t</button>\n\t\t\t</form>\n\t\t</div>\n\t</dialog>\n</ng-container>\n"
+        },
+        {
+            "name": "ButtonComponent",
+            "id": "component-ButtonComponent-86e2311c54fbca7431c12e070d0fd5b0ebe343eec0553a392f182ba0e04a8f86613233d26ee47718fd0e7a65078f580c76a1fcc928ce55de81193d6618025bc4",
+            "file": "src/stories/button.component.ts",
+            "encapsulation": [],
+            "entryComponents": [],
+            "inputs": [],
+            "outputs": [],
+            "providers": [],
+            "selector": "storybook-button",
+            "styleUrls": [
+                "./button.css"
+            ],
+            "styles": [],
+            "template": "<button   type=\"button\"\n   (click)=\"onClick.emit($event)\"\n   [ngClass]=\"classes\"\n   [ngStyle]=\"{ 'background-color': backgroundColor }\"\n >\n   {{ label }}\n </button>",
+            "templateUrl": [],
+            "viewProviders": [],
+            "hostDirectives": [],
+            "inputsClass": [
+                {
+                    "name": "backgroundColor",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "rawdescription": "\n\nWhat background color to use\n",
+                    "description": "<p>What background color to use</p>\n",
+                    "line": 29,
+                    "type": "string",
+                    "decorators": []
+                },
+                {
+                    "name": "label",
+                    "defaultValue": "'Button'",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "jsdoctags": [
+                        {
+                            "pos": 798,
+                            "end": 811,
+                            "flags": 16842752,
+                            "modifierFlagsCache": 0,
+                            "transformFlags": 0,
+                            "kind": 334,
+                            "tagName": {
+                                "pos": 799,
+                                "end": 807,
+                                "flags": 16842752,
+                                "modifierFlagsCache": 0,
+                                "transformFlags": 0,
+                                "kind": 80,
+                                "escapedText": "required"
+                            },
+                            "comment": ""
+                        }
+                    ],
+                    "rawdescription": "\n\nButton contents\n\n",
+                    "description": "<p>Button contents</p>\n",
+                    "line": 43,
+                    "type": "string",
+                    "decorators": []
+                },
+                {
+                    "name": "primary",
+                    "defaultValue": "false",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "rawdescription": "\n\nIs this the principal call to action on the page?\n",
+                    "description": "<p>Is this the principal call to action on the page?</p>\n",
+                    "line": 23,
+                    "type": "boolean",
+                    "decorators": []
+                },
+                {
+                    "name": "size",
+                    "defaultValue": "'medium'",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "rawdescription": "\n\nHow large should the button be?\n",
+                    "description": "<p>How large should the button be?</p>\n",
+                    "line": 35,
+                    "type": "\"small\" | \"medium\" | \"large\"",
+                    "decorators": []
+                }
+            ],
+            "outputsClass": [
+                {
+                    "name": "onClick",
+                    "defaultValue": "new EventEmitter<Event>()",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "rawdescription": "\n\nOptional click handler\n",
+                    "description": "<p>Optional click handler</p>\n",
+                    "line": 49,
+                    "type": "EventEmitter"
+                }
+            ],
+            "propertiesClass": [],
+            "methodsClass": [],
+            "deprecated": false,
+            "deprecationMessage": "",
+            "hostBindings": [],
+            "hostListeners": [],
+            "standalone": true,
+            "imports": [
+                {
+                    "name": "CommonModule",
+                    "type": "module"
+                }
+            ],
+            "description": "",
+            "rawdescription": "\n",
+            "type": "component",
+            "sourceCode": "import { CommonModule } from '@angular/common';\nimport { Component, Input, Output, EventEmitter } from '@angular/core';\n\n@Component({\n  selector: 'storybook-button',\n  standalone: true,\n  imports: [CommonModule],\n  template: ` <button\n    type=\"button\"\n    (click)=\"onClick.emit($event)\"\n    [ngClass]=\"classes\"\n    [ngStyle]=\"{ 'background-color': backgroundColor }\"\n  >\n    {{ label }}\n  </button>`,\n  styleUrls: ['./button.css'],\n})\nexport class ButtonComponent {\n  /**\n   * Is this the principal call to action on the page?\n   */\n  @Input()\n  primary = false;\n\n  /**\n   * What background color to use\n   */\n  @Input()\n  backgroundColor?: string;\n\n  /**\n   * How large should the button be?\n   */\n  @Input()\n  size: 'small' | 'medium' | 'large' = 'medium';\n\n  /**\n   * Button contents\n   *\n   * @required\n   */\n  @Input()\n  label = 'Button';\n\n  /**\n   * Optional click handler\n   */\n  @Output()\n  onClick = new EventEmitter<Event>();\n\n  public get classes(): string[] {\n    const mode = this.primary ? 'storybook-button--primary' : 'storybook-button--secondary';\n\n    return ['storybook-button', `storybook-button--${this.size}`, mode];\n  }\n}\n",
+            "assetsDirs": [],
+            "styleUrlsData": [
+                {
+                    "data": ".storybook-button {\n  font-family: 'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;\n  font-weight: 700;\n  border: 0;\n  border-radius: 3em;\n  cursor: pointer;\n  display: inline-block;\n  line-height: 1;\n}\n.storybook-button--primary {\n  color: white;\n  background-color: #1ea7fd;\n}\n.storybook-button--secondary {\n  color: #333;\n  background-color: transparent;\n  box-shadow: rgba(0, 0, 0, 0.15) 0px 0px 0px 1px inset;\n}\n.storybook-button--small {\n  font-size: 12px;\n  padding: 10px 16px;\n}\n.storybook-button--medium {\n  font-size: 14px;\n  padding: 11px 20px;\n}\n.storybook-button--large {\n  font-size: 16px;\n  padding: 12px 24px;\n}\n",
+                    "styleUrl": "./button.css"
+                }
+            ],
+            "stylesData": "",
+            "extends": [],
+            "accessors": {
+                "classes": {
+                    "name": "classes",
+                    "getSignature": {
+                        "name": "classes",
+                        "type": "[]",
+                        "returnType": "string[]",
+                        "line": 51
+                    }
+                }
+            }
+        },
+        {
+            "name": "HeaderComponent",
+            "id": "component-HeaderComponent-cad94b233ec8e80ceb541e7972c5f9737e08237b4e137112f3987ca48ee0cce5c0d57798d41daa5d4d24d6bdbb2df1606ab68cca2aa0a1785e38f99f3cac0729",
+            "file": "src/stories/header.component.ts",
+            "encapsulation": [],
+            "entryComponents": [],
+            "inputs": [],
+            "outputs": [],
+            "providers": [],
+            "selector": "storybook-header",
+            "styleUrls": [
+                "./header.css"
+            ],
+            "styles": [],
+            "template": "<header>    <div class=\"storybook-header\">\n      <div>\n        <svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\">\n          <g fill=\"none\" fillRule=\"evenodd\">\n            <path\n              d=\"M10 0h12a10 10 0 0110 10v12a10 10 0 01-10 10H10A10 10 0 010 22V10A10 10 0 0110 0z\"\n              fill=\"#FFF\"\n            />\n            <path\n              d=\"M5.3 10.6l10.4 6v11.1l-10.4-6v-11zm11.4-6.2l9.7 5.5-9.7 5.6V4.4z\"\n              fill=\"#555AB9\"\n            />\n            <path\n              d=\"M27.2 10.6v11.2l-10.5 6V16.5l10.5-6zM15.7 4.4v11L6 10l9.7-5.5z\"\n              fill=\"#91BAF8\"\n            />\n          </g>\n        </svg>\n        <h1>Acme</h1>\n      </div>\n      <div>\n        <div *ngIf=\"user\">\n          <span class=\"welcome\">\n            Welcome, <b>{{ user.name }}</b\n            >!\n          </span>\n          <storybook-button\n            *ngIf=\"user\"\n            size=\"small\"\n            (onClick)=\"onLogout.emit($event)\"\n            label=\"Log out\"\n          ></storybook-button>\n        </div>\n        <div *ngIf=\"!user\">\n          <storybook-button\n            *ngIf=\"!user\"\n            size=\"small\"\n            class=\"margin-left\"\n            (onClick)=\"onLogin.emit($event)\"\n            label=\"Log in\"\n          ></storybook-button>\n          <storybook-button\n            *ngIf=\"!user\"\n            size=\"small\"\n            [primary]=\"true\"\n            class=\"margin-left\"\n            (onClick)=\"onCreateAccount.emit($event)\"\n            label=\"Sign up\"\n          ></storybook-button>\n        </div>\n      </div>\n    </div>\n  </header>",
+            "templateUrl": [],
+            "viewProviders": [],
+            "hostDirectives": [],
+            "inputsClass": [
+                {
+                    "name": "user",
+                    "defaultValue": "null",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "line": 69,
+                    "type": "User | null",
+                    "decorators": []
+                }
+            ],
+            "outputsClass": [
+                {
+                    "name": "onCreateAccount",
+                    "defaultValue": "new EventEmitter<Event>()",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "line": 78,
+                    "type": "EventEmitter"
+                },
+                {
+                    "name": "onLogin",
+                    "defaultValue": "new EventEmitter<Event>()",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "line": 72,
+                    "type": "EventEmitter"
+                },
+                {
+                    "name": "onLogout",
+                    "defaultValue": "new EventEmitter<Event>()",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "line": 75,
+                    "type": "EventEmitter"
+                }
+            ],
+            "propertiesClass": [],
+            "methodsClass": [],
+            "deprecated": false,
+            "deprecationMessage": "",
+            "hostBindings": [],
+            "hostListeners": [],
+            "standalone": true,
+            "imports": [
+                {
+                    "name": "CommonModule",
+                    "type": "module"
+                },
+                {
+                    "name": "ButtonComponent",
+                    "type": "component"
+                }
+            ],
+            "description": "",
+            "rawdescription": "\n",
+            "type": "component",
+            "sourceCode": "import { Component, Input, Output, EventEmitter } from '@angular/core';\nimport { CommonModule } from '@angular/common';\n\nimport { ButtonComponent } from './button.component';\nimport type { User } from './user';\n\n@Component({\n  selector: 'storybook-header',\n  standalone: true,\n  imports: [CommonModule, ButtonComponent],\n  template: `<header>\n    <div class=\"storybook-header\">\n      <div>\n        <svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\">\n          <g fill=\"none\" fillRule=\"evenodd\">\n            <path\n              d=\"M10 0h12a10 10 0 0110 10v12a10 10 0 01-10 10H10A10 10 0 010 22V10A10 10 0 0110 0z\"\n              fill=\"#FFF\"\n            />\n            <path\n              d=\"M5.3 10.6l10.4 6v11.1l-10.4-6v-11zm11.4-6.2l9.7 5.5-9.7 5.6V4.4z\"\n              fill=\"#555AB9\"\n            />\n            <path\n              d=\"M27.2 10.6v11.2l-10.5 6V16.5l10.5-6zM15.7 4.4v11L6 10l9.7-5.5z\"\n              fill=\"#91BAF8\"\n            />\n          </g>\n        </svg>\n        <h1>Acme</h1>\n      </div>\n      <div>\n        <div *ngIf=\"user\">\n          <span class=\"welcome\">\n            Welcome, <b>{{ user.name }}</b\n            >!\n          </span>\n          <storybook-button\n            *ngIf=\"user\"\n            size=\"small\"\n            (onClick)=\"onLogout.emit($event)\"\n            label=\"Log out\"\n          ></storybook-button>\n        </div>\n        <div *ngIf=\"!user\">\n          <storybook-button\n            *ngIf=\"!user\"\n            size=\"small\"\n            class=\"margin-left\"\n            (onClick)=\"onLogin.emit($event)\"\n            label=\"Log in\"\n          ></storybook-button>\n          <storybook-button\n            *ngIf=\"!user\"\n            size=\"small\"\n            [primary]=\"true\"\n            class=\"margin-left\"\n            (onClick)=\"onCreateAccount.emit($event)\"\n            label=\"Sign up\"\n          ></storybook-button>\n        </div>\n      </div>\n    </div>\n  </header>`,\n  styleUrls: ['./header.css'],\n})\nexport class HeaderComponent {\n  @Input()\n  user: User | null = null;\n\n  @Output()\n  onLogin = new EventEmitter<Event>();\n\n  @Output()\n  onLogout = new EventEmitter<Event>();\n\n  @Output()\n  onCreateAccount = new EventEmitter<Event>();\n}\n",
+            "assetsDirs": [],
+            "styleUrlsData": [
+                {
+                    "data": ".storybook-header {\n  font-family: 'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;\n  border-bottom: 1px solid rgba(0, 0, 0, 0.1);\n  padding: 15px 20px;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n}\n\n.storybook-header svg {\n  display: inline-block;\n  vertical-align: top;\n}\n\n.storybook-header h1 {\n  font-weight: 700;\n  font-size: 20px;\n  line-height: 1;\n  margin: 6px 0 6px 10px;\n  display: inline-block;\n  vertical-align: top;\n}\n\n.storybook-header button + button {\n  margin-left: 10px;\n}\n\n.storybook-header .welcome {\n  color: #333;\n  font-size: 14px;\n  margin-right: 10px;\n}\n",
+                    "styleUrl": "./header.css"
+                }
+            ],
+            "stylesData": "",
+            "extends": []
+        },
+        {
+            "name": "PageComponent",
+            "id": "component-PageComponent-d32b0f19628254ea3fc5526c4d4564ada1cc83cf936759006d90a46f5874b02a3359e331bddda20b22e74a616a6443c660602ba74dd38ebe1160759e0de6f7ba",
+            "file": "src/stories/page.component.ts",
+            "encapsulation": [],
+            "entryComponents": [],
+            "inputs": [],
+            "outputs": [],
+            "providers": [],
+            "selector": "storybook-page",
+            "styleUrls": [
+                "./page.css"
+            ],
+            "styles": [],
+            "template": "<article>    <storybook-header\n      [user]=\"user\"\n      (onLogout)=\"doLogout()\"\n      (onLogin)=\"doLogin()\"\n      (onCreateAccount)=\"doCreateAccount()\"\n    ></storybook-header>\n    <section class=\"storybook-page\">\n      <h2>Pages in Storybook</h2>\n      <p>\n        We recommend building UIs with a\n        <a href=\"https://componentdriven.org\" target=\"_blank\" rel=\"noopener noreferrer\">\n          <strong>component-driven</strong>\n        </a>\n        process starting with atomic components and ending with pages.\n      </p>\n      <p>\n        Render pages with mock data. This makes it easy to build and review page states without\n        needing to navigate to them in your app. Here are some handy patterns for managing page data\n        in Storybook:\n      </p>\n      <ul>\n        <li>\n          Use a higher-level connected component. Storybook helps you compose such data from the\n          \"args\" of child component stories\n        </li>\n        <li>\n          Assemble data in the page component from your services. You can mock these services out\n          using Storybook.\n        </li>\n      </ul>\n      <p>\n        Get a guided tutorial on component-driven development at\n        <a href=\"https://storybook.js.org/tutorials/\" target=\"_blank\" rel=\"noopener noreferrer\">\n          Storybook tutorials\n        </a>\n        . Read more in the\n        <a href=\"https://storybook.js.org/docs\" target=\"_blank\" rel=\"noopener noreferrer\"> docs </a>\n        .\n      </p>\n      <div class=\"tip-wrapper\">\n        <span class=\"tip\">Tip</span> Adjust the width of the canvas with the\n        <svg width=\"10\" height=\"10\" viewBox=\"0 0 12 12\" xmlns=\"http://www.w3.org/2000/svg\">\n          <g fill=\"none\" fillRule=\"evenodd\">\n            <path\n              d=\"M1.5 5.2h4.8c.3 0 .5.2.5.4v5.1c-.1.2-.3.3-.4.3H1.4a.5.5 0 01-.5-.4V5.7c0-.3.2-.5.5-.5zm0-2.1h6.9c.3 0 .5.2.5.4v7a.5.5 0 01-1 0V4H1.5a.5.5 0 010-1zm0-2.1h9c.3 0 .5.2.5.4v9.1a.5.5 0 01-1 0V2H1.5a.5.5 0 010-1zm4.3 5.2H2V10h3.8V6.2z\"\n              id=\"a\"\n              fill=\"#999\"\n            />\n          </g>\n        </svg>\n        Viewports addon in the toolbar\n      </div>\n    </section>\n  </article>",
+            "templateUrl": [],
+            "viewProviders": [],
+            "hostDirectives": [],
+            "inputsClass": [],
+            "outputsClass": [],
+            "propertiesClass": [
+                {
+                    "name": "user",
+                    "defaultValue": "null",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "User | null",
+                    "optional": false,
+                    "description": "",
+                    "line": 69
+                }
+            ],
+            "methodsClass": [
+                {
+                    "name": "doCreateAccount",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 79,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "doLogin",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 75,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                },
+                {
+                    "name": "doLogout",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 71,
+                    "deprecated": false,
+                    "deprecationMessage": ""
+                }
+            ],
+            "deprecated": false,
+            "deprecationMessage": "",
+            "hostBindings": [],
+            "hostListeners": [],
+            "standalone": true,
+            "imports": [
+                {
+                    "name": "CommonModule",
+                    "type": "module"
+                },
+                {
+                    "name": "HeaderComponent",
+                    "type": "component"
+                }
+            ],
+            "description": "",
+            "rawdescription": "\n",
+            "type": "component",
+            "sourceCode": "import { Component } from '@angular/core';\nimport { CommonModule } from '@angular/common';\n\nimport { HeaderComponent } from './header.component';\nimport type { User } from './user';\n\n@Component({\n  selector: 'storybook-page',\n  standalone: true,\n  imports: [CommonModule, HeaderComponent],\n  template: `<article>\n    <storybook-header\n      [user]=\"user\"\n      (onLogout)=\"doLogout()\"\n      (onLogin)=\"doLogin()\"\n      (onCreateAccount)=\"doCreateAccount()\"\n    ></storybook-header>\n    <section class=\"storybook-page\">\n      <h2>Pages in Storybook</h2>\n      <p>\n        We recommend building UIs with a\n        <a href=\"https://componentdriven.org\" target=\"_blank\" rel=\"noopener noreferrer\">\n          <strong>component-driven</strong>\n        </a>\n        process starting with atomic components and ending with pages.\n      </p>\n      <p>\n        Render pages with mock data. This makes it easy to build and review page states without\n        needing to navigate to them in your app. Here are some handy patterns for managing page data\n        in Storybook:\n      </p>\n      <ul>\n        <li>\n          Use a higher-level connected component. Storybook helps you compose such data from the\n          \"args\" of child component stories\n        </li>\n        <li>\n          Assemble data in the page component from your services. You can mock these services out\n          using Storybook.\n        </li>\n      </ul>\n      <p>\n        Get a guided tutorial on component-driven development at\n        <a href=\"https://storybook.js.org/tutorials/\" target=\"_blank\" rel=\"noopener noreferrer\">\n          Storybook tutorials\n        </a>\n        . Read more in the\n        <a href=\"https://storybook.js.org/docs\" target=\"_blank\" rel=\"noopener noreferrer\"> docs </a>\n        .\n      </p>\n      <div class=\"tip-wrapper\">\n        <span class=\"tip\">Tip</span> Adjust the width of the canvas with the\n        <svg width=\"10\" height=\"10\" viewBox=\"0 0 12 12\" xmlns=\"http://www.w3.org/2000/svg\">\n          <g fill=\"none\" fillRule=\"evenodd\">\n            <path\n              d=\"M1.5 5.2h4.8c.3 0 .5.2.5.4v5.1c-.1.2-.3.3-.4.3H1.4a.5.5 0 01-.5-.4V5.7c0-.3.2-.5.5-.5zm0-2.1h6.9c.3 0 .5.2.5.4v7a.5.5 0 01-1 0V4H1.5a.5.5 0 010-1zm0-2.1h9c.3 0 .5.2.5.4v9.1a.5.5 0 01-1 0V2H1.5a.5.5 0 010-1zm4.3 5.2H2V10h3.8V6.2z\"\n              id=\"a\"\n              fill=\"#999\"\n            />\n          </g>\n        </svg>\n        Viewports addon in the toolbar\n      </div>\n    </section>\n  </article>`,\n  styleUrls: ['./page.css'],\n})\nexport class PageComponent {\n  user: User | null = null;\n\n  doLogout() {\n    this.user = null;\n  }\n\n  doLogin() {\n    this.user = { name: 'Jane Doe' };\n  }\n\n  doCreateAccount() {\n    this.user = { name: 'Jane Doe' };\n  }\n}\n",
+            "assetsDirs": [],
+            "styleUrlsData": [
+                {
+                    "data": ".storybook-page {\n  font-family: 'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;\n  font-size: 14px;\n  line-height: 24px;\n  padding: 48px 20px;\n  margin: 0 auto;\n  max-width: 600px;\n  color: #333;\n}\n\n.storybook-page h2 {\n  font-weight: 700;\n  font-size: 32px;\n  line-height: 1;\n  margin: 0 0 4px;\n  display: inline-block;\n  vertical-align: top;\n}\n\n.storybook-page p {\n  margin: 1em 0;\n}\n\n.storybook-page a {\n  text-decoration: none;\n  color: #1ea7fd;\n}\n\n.storybook-page ul {\n  padding-left: 30px;\n  margin: 1em 0;\n}\n\n.storybook-page li {\n  margin-bottom: 8px;\n}\n\n.storybook-page .tip {\n  display: inline-block;\n  border-radius: 1em;\n  font-size: 11px;\n  line-height: 12px;\n  font-weight: 700;\n  background: #e7fdd8;\n  color: #66bf3c;\n  padding: 4px 12px;\n  margin-right: 10px;\n  vertical-align: top;\n}\n\n.storybook-page .tip-wrapper {\n  font-size: 13px;\n  line-height: 20px;\n  margin-top: 40px;\n  margin-bottom: 40px;\n}\n\n.storybook-page .tip-wrapper svg {\n  display: inline-block;\n  height: 12px;\n  width: 12px;\n  margin-right: 4px;\n  vertical-align: top;\n  margin-top: 3px;\n}\n\n.storybook-page .tip-wrapper svg path {\n  fill: #1ea7fd;\n}\n",
+                    "styleUrl": "./page.css"
+                }
+            ],
+            "stylesData": "",
+            "extends": []
+        }
+    ],
+    "modules": [],
+    "miscellaneous": {
+        "variables": [
+            {
+                "name": "Large",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/button.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{\n\targs: {\n\t\tsize: 'large',\n\t\tlabel: 'Button'\n\t}\n}"
+            },
+            {
+                "name": "LoggedIn",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/header.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{\n  args: {\n    user: {\n      name: 'Jane Doe',\n    },\n  },\n}"
+            },
+            {
+                "name": "LoggedIn",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/page.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{\n  play: async ({ canvasElement }) => {\n    const canvas = within(canvasElement);\n    const loginButton = canvas.getByRole('button', { name: /Log in/i });\n    await expect(loginButton).toBeInTheDocument();\n    await userEvent.click(loginButton);\n    await expect(loginButton).not.toBeInTheDocument();\n\n    const logoutButton = canvas.getByRole('button', { name: /Log out/i });\n    await expect(logoutButton).toBeInTheDocument();\n  },\n}"
+            },
+            {
+                "name": "LoggedOut",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/header.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{}"
+            },
+            {
+                "name": "LoggedOut",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/page.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{}"
+            },
+            {
+                "name": "meta",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/button.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Meta<ButtonComponent>",
+                "defaultValue": "{\n\ttitle: 'Example/Button',\n\tcomponent: ButtonComponent,\n\ttags: ['autodocs'],\n\trender: (args: ButtonComponent) => ({\n\t\tprops: {\n\t\t\tbackgroundColor: null,\n\t\t\t...args\n\t\t}\n\t}),\n\targTypes: {\n\t\tbackgroundColor: {\n\t\t\tcontrol: 'color'\n\t\t}\n\t}\n}"
+            },
+            {
+                "name": "meta",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/header.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Meta<HeaderComponent>",
+                "defaultValue": "{\n  title: 'Example/Header',\n  component: HeaderComponent,\n  // This component will have an automatically generated Autodocs entry: https://storybook.js.org/docs/writing-docs/autodocs\n  tags: ['autodocs'],\n  parameters: {\n    // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout\n    layout: 'fullscreen',\n  },\n}"
+            },
+            {
+                "name": "meta",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/page.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Meta<PageComponent>",
+                "defaultValue": "{\n  title: 'Example/Page',\n  component: PageComponent,\n  parameters: {\n    // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout\n    layout: 'fullscreen',\n  },\n}"
+            },
+            {
+                "name": "preview",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": ".storybook/preview.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Preview",
+                "defaultValue": "{\n  parameters: {\n    actions: { argTypesRegex: \"^on[A-Z].*\" },\n    controls: {\n      matchers: {\n        color: /(background|color)$/i,\n        date: /Date$/i,\n      },\n    },\n  },\n}"
+            },
+            {
+                "name": "Primary",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/button.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{\n\targs: {\n\t\tprimary: true,\n\t\tlabel: 'Button'\n\t},\n\tparameters: {\n\t\tdesign: {\n\t\t\ttype: 'figma',\n\t\t\turl: 'https://www.figma.com/file/BzObiHbMTWwMpyQSEp7mKP/Litnet-%7C-Design-System?type=design&node-id=174%3A4377&mode=dev'\n\t\t}\n\t}\n}"
+            },
+            {
+                "name": "Secondary",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/button.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{\n\targs: {\n\t\tlabel: 'Button'\n\t}\n}"
+            },
+            {
+                "name": "Small",
+                "ctype": "miscellaneous",
+                "subtype": "variable",
+                "file": "src/stories/button.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "type": "Story",
+                "defaultValue": "{\n\targs: {\n\t\tsize: 'small',\n\t\tlabel: 'Button'\n\t}\n}"
+            }
+        ],
+        "functions": [],
+        "typealiases": [
+            {
+                "name": "Story",
+                "ctype": "miscellaneous",
+                "subtype": "typealias",
+                "rawtype": "StoryObj<ButtonComponent>",
+                "file": "src/stories/button.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "description": "",
+                "kind": 183
+            },
+            {
+                "name": "Story",
+                "ctype": "miscellaneous",
+                "subtype": "typealias",
+                "rawtype": "StoryObj<HeaderComponent>",
+                "file": "src/stories/header.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "description": "",
+                "kind": 183
+            },
+            {
+                "name": "Story",
+                "ctype": "miscellaneous",
+                "subtype": "typealias",
+                "rawtype": "StoryObj<PageComponent>",
+                "file": "src/stories/page.stories.ts",
+                "deprecated": false,
+                "deprecationMessage": "",
+                "description": "",
+                "kind": 183
+            }
+        ],
+        "enumerations": [],
+        "groupedVariables": {
+            "src/stories/button.stories.ts": [
+                {
+                    "name": "Large",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/button.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{\n\targs: {\n\t\tsize: 'large',\n\t\tlabel: 'Button'\n\t}\n}"
+                },
+                {
+                    "name": "meta",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/button.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Meta<ButtonComponent>",
+                    "defaultValue": "{\n\ttitle: 'Example/Button',\n\tcomponent: ButtonComponent,\n\ttags: ['autodocs'],\n\trender: (args: ButtonComponent) => ({\n\t\tprops: {\n\t\t\tbackgroundColor: null,\n\t\t\t...args\n\t\t}\n\t}),\n\targTypes: {\n\t\tbackgroundColor: {\n\t\t\tcontrol: 'color'\n\t\t}\n\t}\n}"
+                },
+                {
+                    "name": "Primary",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/button.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{\n\targs: {\n\t\tprimary: true,\n\t\tlabel: 'Button'\n\t},\n\tparameters: {\n\t\tdesign: {\n\t\t\ttype: 'figma',\n\t\t\turl: 'https://www.figma.com/file/BzObiHbMTWwMpyQSEp7mKP/Litnet-%7C-Design-System?type=design&node-id=174%3A4377&mode=dev'\n\t\t}\n\t}\n}"
+                },
+                {
+                    "name": "Secondary",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/button.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{\n\targs: {\n\t\tlabel: 'Button'\n\t}\n}"
+                },
+                {
+                    "name": "Small",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/button.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{\n\targs: {\n\t\tsize: 'small',\n\t\tlabel: 'Button'\n\t}\n}"
+                }
+            ],
+            "src/stories/header.stories.ts": [
+                {
+                    "name": "LoggedIn",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/header.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{\n  args: {\n    user: {\n      name: 'Jane Doe',\n    },\n  },\n}"
+                },
+                {
+                    "name": "LoggedOut",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/header.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{}"
+                },
+                {
+                    "name": "meta",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/header.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Meta<HeaderComponent>",
+                    "defaultValue": "{\n  title: 'Example/Header',\n  component: HeaderComponent,\n  // This component will have an automatically generated Autodocs entry: https://storybook.js.org/docs/writing-docs/autodocs\n  tags: ['autodocs'],\n  parameters: {\n    // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout\n    layout: 'fullscreen',\n  },\n}"
+                }
+            ],
+            "src/stories/page.stories.ts": [
+                {
+                    "name": "LoggedIn",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/page.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{\n  play: async ({ canvasElement }) => {\n    const canvas = within(canvasElement);\n    const loginButton = canvas.getByRole('button', { name: /Log in/i });\n    await expect(loginButton).toBeInTheDocument();\n    await userEvent.click(loginButton);\n    await expect(loginButton).not.toBeInTheDocument();\n\n    const logoutButton = canvas.getByRole('button', { name: /Log out/i });\n    await expect(logoutButton).toBeInTheDocument();\n  },\n}"
+                },
+                {
+                    "name": "LoggedOut",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/page.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Story",
+                    "defaultValue": "{}"
+                },
+                {
+                    "name": "meta",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": "src/stories/page.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Meta<PageComponent>",
+                    "defaultValue": "{\n  title: 'Example/Page',\n  component: PageComponent,\n  parameters: {\n    // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout\n    layout: 'fullscreen',\n  },\n}"
+                }
+            ],
+            ".storybook/preview.ts": [
+                {
+                    "name": "preview",
+                    "ctype": "miscellaneous",
+                    "subtype": "variable",
+                    "file": ".storybook/preview.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "type": "Preview",
+                    "defaultValue": "{\n  parameters: {\n    actions: { argTypesRegex: \"^on[A-Z].*\" },\n    controls: {\n      matchers: {\n        color: /(background|color)$/i,\n        date: /Date$/i,\n      },\n    },\n  },\n}"
+                }
+            ]
+        },
+        "groupedFunctions": {},
+        "groupedEnumerations": {},
+        "groupedTypeAliases": {
+            "src/stories/button.stories.ts": [
+                {
+                    "name": "Story",
+                    "ctype": "miscellaneous",
+                    "subtype": "typealias",
+                    "rawtype": "StoryObj<ButtonComponent>",
+                    "file": "src/stories/button.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "description": "",
+                    "kind": 183
+                }
+            ],
+            "src/stories/header.stories.ts": [
+                {
+                    "name": "Story",
+                    "ctype": "miscellaneous",
+                    "subtype": "typealias",
+                    "rawtype": "StoryObj<HeaderComponent>",
+                    "file": "src/stories/header.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "description": "",
+                    "kind": 183
+                }
+            ],
+            "src/stories/page.stories.ts": [
+                {
+                    "name": "Story",
+                    "ctype": "miscellaneous",
+                    "subtype": "typealias",
+                    "rawtype": "StoryObj<PageComponent>",
+                    "file": "src/stories/page.stories.ts",
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "description": "",
+                    "kind": 183
+                }
+            ]
+        }
+    },
+    "routes": [],
+    "coverage": {
+        "count": 3,
+        "status": "low",
+        "files": [
+            {
+                "filePath": ".storybook/preview.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "preview",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/app.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "AppComponent",
+                "coveragePercent": 0,
+                "coverageCount": "0/39",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/app.component.ts",
+                "type": "interface",
+                "linktype": "interface",
+                "name": "Daylik",
+                "coveragePercent": 0,
+                "coverageCount": "0/2",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/app.component.ts",
+                "type": "interface",
+                "linktype": "interface",
+                "name": "DaylikSettingsForm",
+                "coveragePercent": 0,
+                "coverageCount": "0/4",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/app.component.ts",
+                "type": "interface",
+                "linktype": "interface",
+                "name": "Team",
+                "coveragePercent": 0,
+                "coverageCount": "0/3",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/app.component.ts",
+                "type": "interface",
+                "linktype": "interface",
+                "name": "TeamMember",
+                "coveragePercent": 0,
+                "coverageCount": "0/7",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/button.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "ButtonComponent",
+                "coveragePercent": 83,
+                "coverageCount": "5/6",
+                "status": "very-good"
+            },
+            {
+                "filePath": "src/stories/button.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "Large",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/button.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "meta",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/button.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "Primary",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/button.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "Secondary",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/button.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "Small",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/header.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "HeaderComponent",
+                "coveragePercent": 0,
+                "coverageCount": "0/5",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/header.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "LoggedIn",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/header.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "LoggedOut",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/header.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "meta",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/page.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "PageComponent",
+                "coveragePercent": 0,
+                "coverageCount": "0/5",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/page.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "LoggedIn",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/page.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "LoggedOut",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/page.stories.ts",
+                "type": "variable",
+                "linktype": "miscellaneous",
+                "linksubtype": "variable",
+                "name": "meta",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/stories/user.ts",
+                "type": "interface",
+                "linktype": "interface",
+                "name": "User",
+                "coveragePercent": 0,
+                "coverageCount": "0/2",
+                "status": "low"
+            }
+        ]
+    }
+}
